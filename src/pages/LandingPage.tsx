@@ -43,7 +43,7 @@ const LandingPage = () => {
           }}
         />
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-background via-background/95 to-background/60" />
-        <div className="container">
+        <div className="container relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <motion.p
