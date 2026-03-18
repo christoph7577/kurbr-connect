@@ -3,6 +3,7 @@ import { ArrowRight, Clock, Shield, Zap, Truck, MapPin, CreditCard } from "lucid
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ETACard } from "@/components/ETACard";
+import heroImage from "@/assets/hero-industrial.jpg";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -33,7 +34,16 @@ const LandingPage = () => {
 
       {/* Hero */}
       <section className="relative min-h-screen flex items-center pt-16">
-        <div className="container">
+        <div
+          className="absolute inset-0 z-0 opacity-20"
+          style={{
+            backgroundImage: `url(${heroImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-background via-background/95 to-background/60" />
+        <div className="container relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <motion.p
