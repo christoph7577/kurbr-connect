@@ -3,6 +3,7 @@ import { ArrowRight, Clock, Shield, Zap, Truck, MapPin, CreditCard } from "lucid
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ETACard } from "@/components/ETACard";
+import heroImage from "@/assets/hero-industrial.jpg";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
