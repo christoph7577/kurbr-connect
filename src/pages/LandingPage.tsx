@@ -34,6 +34,15 @@ const LandingPage = () => {
 
       {/* Hero */}
       <section className="relative min-h-screen flex items-center pt-16">
+        <div
+          className="absolute inset-0 z-0 opacity-20"
+          style={{
+            backgroundImage: `url(${heroImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-background via-background/95 to-background/60" />
         <div className="container">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
