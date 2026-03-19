@@ -270,7 +270,6 @@ const LandingPage = () => {
               </Button>
             </Link>
           </motion.div>
-          </div>
         </div>
       </section>
 
