@@ -7,6 +7,7 @@ import LandingPage from "./pages/LandingPage";
 import SchedulePage from "./pages/SchedulePage";
 import AdminPage from "./pages/AdminPage";
 import TrackingPage from "./pages/TrackingPage";
+import HaulerOnboardingPage from "./pages/HaulerOnboardingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
