@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, MessageSquare } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -14,76 +16,125 @@ const statuses = [
   { id: "completed", label: "COMPLETED" },
 ];
 
+const statusIndex = (s: string) => {
+  const i = statuses.findIndex((st) => st.id === s);
+  return i >= 0 ? i : 0;
+};
+
 const TrackingPage = () => {
-  const [currentStatus, setCurrentStatus] = useState(2); // en_route
-  const [eta, setEta] = useState(847); // seconds
-  const [flash, setFlash] = useState(false);
+  const [searchParams] = useSearchParams();
+  const jobParam = searchParams.get("job");
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setEta((prev) => {
-        if (prev <= 1) {
-          // Simulate arrival
-          setCurrentStatus(3);
-          setFlash(true);
-          setTimeout(() => setFlash(false), 300);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const [jobNumber, setJobNumber] = useState(jobParam || "");
+  const [job, setJob] = useState<Tables<"jobs"> | null>(null);
+  const [loading, setLoading] = useState(!!jobParam);
+  const [notFound, setNotFound] = useState(false);
 
-  const formatEta = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  const fetchJob = async (num: string) => {
+    setLoading(true);
+    setNotFound(false);
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("job_number", num.toUpperCase())
+      .maybeSingle();
+
+    if (error || !data) {
+      setNotFound(true);
+      setJob(null);
+    } else {
+      setJob(data);
+    }
+    setLoading(false);
   };
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        className={`min-h-screen flex flex-col transition-colors duration-300 ${
-          flash ? 'bg-primary' : 'bg-background'
-        }`}
-      >
-        {/* Header */}
+  useEffect(() => {
+    if (jobParam) fetchJob(jobParam);
+  }, [jobParam]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!job) return;
+    const channel = supabase
+      .channel(`job-${job.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${job.id}` }, (payload) => {
+        setJob(payload.new as Tables<"jobs">);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [job?.id]);
+
+  const currentStatus = job ? statusIndex(job.status) : 0;
+
+  // If no job loaded, show search
+  if (!job && !loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
         <nav className="glass">
           <div className="container flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 text-foreground">
               <ArrowLeft className="w-4 h-4" />
               <span className="text-xs uppercase tracking-widest">Back</span>
             </Link>
-            <p className="text-xl font-bold tracking-[-0.06em]">
-              KURBR<span className="text-primary">.</span>
-            </p>
-            <p className="text-xs font-mono text-muted-foreground">JOB-2847</p>
+            <p className="text-xl font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></p>
+            <div className="w-16" />
+          </div>
+        </nav>
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <h2 className="text-3xl font-bold mb-2">Track Your Pickup</h2>
+          <p className="text-muted-foreground font-mono text-sm mb-8">Enter your job number to see live status</p>
+          <div className="w-full max-w-sm space-y-4">
+            <div className="relative">
+              <Search className="absolute left-0 top-3 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={jobNumber}
+                onChange={(e) => setJobNumber(e.target.value)}
+                placeholder="JOB-2847"
+                className="w-full bg-transparent border-b-2 border-secondary focus:border-primary outline-none transition-colors py-2 pl-6 font-mono uppercase"
+              />
+            </div>
+            {notFound && <p className="text-destructive text-sm font-mono">Job not found. Check the number and try again.</p>}
+            <Button variant="default" className="w-full" onClick={() => fetchJob(jobNumber)} disabled={jobNumber.length < 3}>
+              Track Job
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div className="min-h-screen flex flex-col bg-background">
+        <nav className="glass">
+          <div className="container flex items-center justify-between h-16">
+            <Link to="/" className="flex items-center gap-2 text-foreground">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-xs uppercase tracking-widest">Back</span>
+            </Link>
+            <p className="text-xl font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></p>
+            <p className="text-xs font-mono text-muted-foreground">{job!.job_number}</p>
           </div>
         </nav>
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
-          {/* Big ETA */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={springBolt}
-            className="text-center mb-16"
-          >
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-4">
-              Estimated Arrival
+          {/* Status display */}
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={springBolt} className="text-center mb-16">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-4">Status</p>
+            <p className="text-5xl md:text-7xl font-mono font-bold tracking-tight text-foreground uppercase">
+              {job!.status.replace("_", " ")}
             </p>
-            <motion.p
-              key={eta}
-              initial={{ opacity: 0.7 }}
-              animate={{ opacity: 1 }}
-              className="text-7xl md:text-9xl font-mono font-bold tracking-tight text-foreground"
-            >
-              {formatEta(eta)}
-            </motion.p>
             <p className="text-sm text-muted-foreground mt-4 font-mono">
-              {currentStatus >= 3 ? "HAULER HAS ARRIVED" : "MINUTES REMAINING"}
+              {job!.scheduled_date} · {job!.scheduled_time}
             </p>
           </motion.div>
 
@@ -93,58 +144,36 @@ const TrackingPage = () => {
               {statuses.map((s, i) => (
                 <div key={s.id} className="flex items-center flex-1">
                   <div className="flex flex-col items-center">
-                    <div
-                      className={`w-3 h-3 rounded-full transition-colors ${
-                        i <= currentStatus ? 'bg-primary' : 'bg-secondary'
-                      }`}
-                    />
-                    <p className={`text-[10px] mt-2 uppercase tracking-widest ${
-                      i <= currentStatus ? 'text-primary' : 'text-muted-foreground'
-                    }`}>
-                      {s.label}
-                    </p>
+                    <div className={`w-3 h-3 rounded-full transition-colors ${i <= currentStatus ? 'bg-primary' : 'bg-secondary'}`} />
+                    <p className={`text-[10px] mt-2 uppercase tracking-widest ${i <= currentStatus ? 'text-primary' : 'text-muted-foreground'}`}>{s.label}</p>
                   </div>
                   {i < statuses.length - 1 && (
-                    <div className={`h-px flex-1 mx-1 transition-colors ${
-                      i < currentStatus ? 'bg-primary' : 'bg-secondary'
-                    }`} />
+                    <div className={`h-px flex-1 mx-1 transition-colors ${i < currentStatus ? 'bg-primary' : 'bg-secondary'}`} />
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Hauler Info */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...springBolt, delay: 0.2 }}
-            className="w-full max-w-md glass p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Your Hauler</p>
-                <p className="font-bold">Marcus J.</p>
+          {/* Job Info */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springBolt, delay: 0.2 }} className="w-full max-w-md glass p-6">
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">Service</span>
+                <span className="font-mono text-sm uppercase">{job!.service_type}</span>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-mono text-muted-foreground">UNIT-047</p>
-                <p className="text-xs font-mono text-muted-foreground">UT · 4K3 M91</p>
+              <div className="flex justify-between">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">Address</span>
+                <span className="font-mono text-sm text-right max-w-[200px]">{job!.address}</span>
               </div>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 gap-2">
-                <Phone className="w-4 h-4" /> Call
-              </Button>
-              <Button variant="outline" className="flex-1 gap-2">
-                <MessageSquare className="w-4 h-4" /> Message
-              </Button>
+              {job!.price_cents && (
+                <div className="flex justify-between">
+                  <span className="text-xs uppercase tracking-widest text-muted-foreground">Price</span>
+                  <span className="font-mono text-sm font-bold text-primary">${(job!.price_cents / 100).toFixed(0)}</span>
+                </div>
+              )}
             </div>
           </motion.div>
-
-          {/* Cancel */}
-          <Button variant="ghost" className="mt-8 text-destructive">
-            Cancel Pickup
-          </Button>
         </div>
       </motion.div>
     </AnimatePresence>
