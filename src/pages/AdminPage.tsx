@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Bell, Menu, Loader2 } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { StatsGrid } from "@/components/admin/StatsGrid";
@@ -9,12 +9,19 @@ import type { Tables } from "@/integrations/supabase/types";
 
 const mapJob = (j: Tables<"jobs">): Job => ({
   id: j.job_number,
+  dbId: j.id,
   customer: j.customer_name || "Unknown",
   address: j.address,
   status: j.status,
-  hauler: "Unassigned",
+  hauler: j.hauler_id ? "Assigned" : "Unassigned",
+  haulerId: j.hauler_id,
   eta: j.scheduled_time || "—",
   price: j.price_cents ? `$${(j.price_cents / 100).toFixed(0)}` : "—",
+  priceCents: j.price_cents,
+  description: j.description,
+  customerEmail: j.customer_email,
+  customerPhone: j.customer_phone,
+  scheduledDate: j.scheduled_date,
 });
 
 const AdminPage = () => {
@@ -25,7 +32,7 @@ const AdminPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     const { data, error } = await supabase
       .from("jobs")
       .select("*")
@@ -34,14 +41,19 @@ const AdminPage = () => {
     if (!error && data) {
       const mapped = data.map(mapJob);
       setJobs(mapped);
-      if (!selectedJob && mapped.length > 0) setSelectedJob(mapped[0]);
+      // Update selected job if it exists
+      if (selectedJob) {
+        const updated = mapped.find((j) => j.dbId === selectedJob.dbId);
+        if (updated) setSelectedJob(updated);
+      } else if (mapped.length > 0) {
+        setSelectedJob(mapped[0]);
+      }
     }
     setLoading(false);
-  };
+  }, [selectedJob?.dbId]);
 
   useEffect(() => {
     fetchJobs();
-    // Realtime
     const channel = supabase
       .channel("admin-jobs")
       .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
@@ -65,17 +77,14 @@ const AdminPage = () => {
     : jobs;
 
   const activeCount = jobs.filter((j) => !["completed", "cancelled"].includes(j.status)).length;
-  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && j.status !== "completed").length;
-  const todayRevenue = jobs.reduce((sum, j) => {
-    const num = parseInt(j.price.replace(/[^0-9]/g, "")) || 0;
-    return sum + num;
-  }, 0);
+  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status)).length;
+  const todayRevenue = jobs.reduce((sum, j) => sum + (j.priceCents || 0), 0);
 
   const stats = {
     activeJobs: activeCount.toString(),
     unassigned: unassignedCount.toString(),
     totalJobs: jobs.length.toString(),
-    todayRevenue: `$${todayRevenue.toLocaleString()}`,
+    todayRevenue: `$${(todayRevenue / 100).toLocaleString()}`,
   };
 
   return (
@@ -123,7 +132,7 @@ const AdminPage = () => {
                     <button onClick={() => setShowDetail(false)} className="text-xs uppercase tracking-widest text-primary font-mono mb-4 flex items-center gap-1">
                       ← Back to queue
                     </button>
-                    <JobDetail job={selectedJob} />
+                    <JobDetail job={selectedJob} onUpdate={fetchJobs} />
                   </div>
                 ) : (
                   <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
@@ -134,7 +143,7 @@ const AdminPage = () => {
                 <div className="col-span-2">
                   <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
                 </div>
-                {selectedJob && <JobDetail job={selectedJob} />}
+                {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} />}
               </div>
             </>
           )}
