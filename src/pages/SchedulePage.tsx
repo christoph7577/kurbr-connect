@@ -93,7 +93,10 @@ const SchedulePage = () => {
           {step === 0 && (
             <motion.div key="service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={springBolt}>
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Step 01</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-10">What are we hauling?</h2>
+              <div className="flex items-center gap-4 mb-10">
+                <h2 className="text-3xl md:text-4xl font-bold">What are we hauling?</h2>
+                <img src={scrappyClipboard} alt="Scrappy with clipboard" className="w-14 h-14 object-contain hidden md:block" />
+              </div>
               <div className="grid gap-3">
                 {([
                   { id: "residential" as const, title: "RESIDENTIAL", desc: "Furniture, appliances, yard waste, debris", price: "From $89" },
