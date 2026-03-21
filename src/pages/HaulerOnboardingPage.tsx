@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
