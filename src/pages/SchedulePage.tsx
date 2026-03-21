@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import scrappyClipboard from "@/assets/scrappy-clipboard.png";
+import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -91,7 +93,10 @@ const SchedulePage = () => {
           {step === 0 && (
             <motion.div key="service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={springBolt}>
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Step 01</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-10">What are we hauling?</h2>
+              <div className="flex items-center gap-4 mb-10">
+                <h2 className="text-3xl md:text-4xl font-bold">What are we hauling?</h2>
+                <img src={scrappyClipboard} alt="Scrappy with clipboard" className="w-14 h-14 object-contain hidden md:block" />
+              </div>
               <div className="grid gap-3">
                 {([
                   { id: "residential" as const, title: "RESIDENTIAL", desc: "Furniture, appliances, yard waste, debris", price: "From $89" },
@@ -193,7 +198,10 @@ const SchedulePage = () => {
           {step === 4 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={springBolt}>
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Confirm</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-10">Review your booking</h2>
+              <div className="flex items-center gap-4 mb-10">
+                <h2 className="text-3xl md:text-4xl font-bold">Review your booking</h2>
+                <img src={scrappyThumbsup} alt="Scrappy thumbs up" className="w-14 h-14 object-contain" />
+              </div>
               <div className="border-milled divide-y divide-border">
                 <div className="p-6 flex justify-between">
                   <span className="text-xs uppercase tracking-widest text-muted-foreground">Service</span>
