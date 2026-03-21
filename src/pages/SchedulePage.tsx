@@ -198,7 +198,10 @@ const SchedulePage = () => {
           {step === 4 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={springBolt}>
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Confirm</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-10">Review your booking</h2>
+              <div className="flex items-center gap-4 mb-10">
+                <h2 className="text-3xl md:text-4xl font-bold">Review your booking</h2>
+                <img src={scrappyThumbsup} alt="Scrappy thumbs up" className="w-14 h-14 object-contain" />
+              </div>
               <div className="border-milled divide-y divide-border">
                 <div className="p-6 flex justify-between">
                   <span className="text-xs uppercase tracking-widest text-muted-foreground">Service</span>
