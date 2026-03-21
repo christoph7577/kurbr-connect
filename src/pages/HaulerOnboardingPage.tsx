@@ -146,9 +146,7 @@ const HaulerOnboardingPage = () => {
           transition={springBolt}
           className="text-center max-w-md px-6"
         >
-          <div className="w-16 h-16 bg-primary flex items-center justify-center mx-auto mb-8">
-            <Check className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img src={scrappyThumbsup} alt="Scrappy thumbs up" className="w-24 h-24 object-contain mx-auto mb-6" />
           <h1 className="text-3xl font-bold mb-4">Application Received</h1>
           <p className="text-muted-foreground mb-8">
             We'll review your application within 24-48 hours. Check your email at{" "}
