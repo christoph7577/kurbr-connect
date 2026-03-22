@@ -14,6 +14,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import HaulerDashboardPage from "./pages/HaulerDashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,11 @@ const App = () => (
             } />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/hauler-onboarding" element={<HaulerOnboardingPage />} />
+            <Route path="/hauler-dashboard" element={
+              <ProtectedRoute>
+                <HaulerDashboardPage />
+              </ProtectedRoute>
+            } />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
