@@ -14,6 +14,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import HaulerDashboardPage from "./pages/HaulerDashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
