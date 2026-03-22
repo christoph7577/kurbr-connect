@@ -36,6 +36,11 @@ const App = () => (
             } />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/hauler-onboarding" element={<HaulerOnboardingPage />} />
+            <Route path="/hauler-dashboard" element={
+              <ProtectedRoute>
+                <HaulerDashboardPage />
+              </ProtectedRoute>
+            } />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
