@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Search, Bell, Menu, Loader2 } from "lucide-react";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { StatsGrid } from "@/components/admin/StatsGrid";
 import { JobQueue, type Job } from "@/components/admin/JobQueue";
 import { JobDetail } from "@/components/admin/JobDetail";
+import { HaulerManagement } from "@/components/admin/HaulerManagement";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
