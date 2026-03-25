@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Search, Bell, Menu, Loader2 } from "lucide-react";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { StatsGrid } from "@/components/admin/StatsGrid";
 import { JobQueue, type Job } from "@/components/admin/JobQueue";
 import { JobDetail } from "@/components/admin/JobDetail";
+import { HaulerManagement } from "@/components/admin/HaulerManagement";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -26,6 +27,7 @@ const mapJob = (j: Tables<"jobs">): Job => ({
 
 const AdminPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<AdminView>("dashboard");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -89,7 +91,7 @@ const AdminPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
-      <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeView={activeView} onChangeView={setActiveView} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
@@ -118,7 +120,9 @@ const AdminPage = () => {
         </header>
 
         <div className="flex-1 p-4 md:p-6 overflow-auto">
-          {loading ? (
+          {activeView === "haulers" ? (
+            <HaulerManagement />
+          ) : loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
