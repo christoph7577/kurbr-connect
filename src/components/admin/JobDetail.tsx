@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CheckCircle, MapPin, ChevronDown, Loader2, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,6 +20,12 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-destructive/20 text-destructive",
 };
 
+interface Hauler {
+  id: string;
+  businessName: string;
+  status: string;
+}
+
 interface JobDetailProps {
   job: Job;
   onUpdate: () => void;
@@ -28,6 +34,41 @@ interface JobDetailProps {
 export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
   const [updating, setUpdating] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showHaulerPicker, setShowHaulerPicker] = useState(false);
+  const [haulers, setHaulers] = useState<Hauler[]>([]);
+  const [loadingHaulers, setLoadingHaulers] = useState(false);
+
+  const fetchHaulers = async () => {
+    setLoadingHaulers(true);
+    const { data, error } = await supabase
+      .from("hauler_profiles")
+      .select("id, business_name, status, user_id")
+      .eq("status", "approved");
+
+    if (!error && data) {
+      // Get profile names for haulers
+      const userIds = data.map((h) => h.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map((p) => [p.id, p.full_name]) || []);
+
+      setHaulers(
+        data.map((h) => ({
+          id: h.id,
+          businessName: h.business_name || profileMap.get(h.user_id) || "Unnamed Hauler",
+          status: h.status,
+        }))
+      );
+    }
+    setLoadingHaulers(false);
+  };
+
+  useEffect(() => {
+    fetchHaulers();
+  }, []);
 
   const updateStatus = async (newStatus: JobStatus) => {
     setUpdating(true);
@@ -47,6 +88,24 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
     setUpdating(false);
   };
 
+  const assignHauler = async (haulerId: string | null) => {
+    setUpdating(true);
+    setShowHaulerPicker(false);
+    const { error } = await supabase
+      .from("jobs")
+      .update({ hauler_id: haulerId })
+      .eq("id", job.dbId);
+
+    if (error) {
+      toast.error("Failed to assign hauler");
+      console.error(error);
+    } else {
+      toast.success(haulerId ? `Hauler assigned to ${job.id}` : `Hauler removed from ${job.id}`);
+      onUpdate();
+    }
+    setUpdating(false);
+  };
+
   const advanceStatus = () => {
     const currentIdx = statusFlow.indexOf(job.status as JobStatus);
     if (currentIdx < statusFlow.length - 1) {
@@ -59,6 +118,8 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
     return idx >= 0 && idx < statusFlow.length - 1 ? statusFlow[idx + 1] : null;
   })();
 
+  const assignedHaulerName = haulers.find((h) => h.id === job.haulerId)?.businessName;
+
   return (
     <div>
       <h3 className="text-sm font-bold uppercase tracking-widest mb-4">Job Detail</h3>
@@ -67,7 +128,7 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
           <span className="font-mono text-lg font-bold">{job.id}</span>
           <div className="relative">
             <button
-              onClick={() => setShowStatusPicker(!showStatusPicker)}
+              onClick={() => { setShowStatusPicker(!showStatusPicker); setShowHaulerPicker(false); }}
               className={`text-xs font-mono uppercase px-3 py-1 flex items-center gap-1 ${statusColors[job.status] || "bg-muted text-muted-foreground"}`}
             >
               {job.status.replace("_", " ")}
@@ -106,13 +167,62 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
             { label: "Date", value: job.scheduledDate || "—" },
             { label: "Time", value: job.eta },
             { label: "Price", value: job.price },
-            { label: "Hauler", value: job.hauler },
           ].map((field) => (
             <div key={field.label} className="flex justify-between">
               <span className="text-xs uppercase tracking-widest text-muted-foreground">{field.label}</span>
               <span className="text-sm font-mono text-right max-w-[60%] truncate">{field.value}</span>
             </div>
           ))}
+
+          {/* Hauler assignment */}
+          <div className="flex justify-between items-center">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">Hauler</span>
+            <div className="relative">
+              <button
+                onClick={() => { setShowHaulerPicker(!showHaulerPicker); setShowStatusPicker(false); }}
+                className={`text-sm font-mono flex items-center gap-1.5 px-2 py-0.5 transition-colors hover:bg-secondary/50 ${
+                  job.haulerId ? "text-foreground" : "text-primary"
+                }`}
+              >
+                {job.haulerId ? (assignedHaulerName || "Assigned") : "Assign"}
+                <UserPlus className="w-3 h-3" />
+              </button>
+              {showHaulerPicker && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-card border-milled shadow-card min-w-[200px] max-h-[240px] overflow-y-auto">
+                  {loadingHaulers ? (
+                    <div className="p-4 flex justify-center">
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : haulers.length === 0 ? (
+                    <div className="p-4 text-xs text-muted-foreground font-mono">No approved haulers</div>
+                  ) : (
+                    <>
+                      {haulers.map((h) => (
+                        <button
+                          key={h.id}
+                          onClick={() => assignHauler(h.id)}
+                          className={`w-full text-left px-4 py-2.5 text-xs font-mono hover:bg-secondary/50 transition-colors ${
+                            h.id === job.haulerId ? "text-primary bg-primary/5" : "text-foreground"
+                          }`}
+                        >
+                          {h.businessName}
+                        </button>
+                      ))}
+                      {job.haulerId && (
+                        <button
+                          onClick={() => assignHauler(null)}
+                          className="w-full text-left px-4 py-2.5 text-xs font-mono uppercase hover:bg-destructive/10 text-destructive border-t border-border"
+                        >
+                          Unassign
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {job.description && (
             <div>
               <span className="text-xs uppercase tracking-widest text-muted-foreground block mb-1">Notes</span>
