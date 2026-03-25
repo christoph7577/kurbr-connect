@@ -27,6 +27,7 @@ const mapJob = (j: Tables<"jobs">): Job => ({
 
 const AdminPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<AdminView>("dashboard");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetail, setShowDetail] = useState(false);
