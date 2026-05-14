@@ -15,6 +15,7 @@ export const jobStatusEnum = pgEnum("job_status", [
 export const jobsTable = pgTable("jobs", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   jobNumber: text("job_number").notNull().unique(),
+  trackingToken: text("tracking_token").notNull().unique().$defaultFn(() => crypto.randomUUID()),
   serviceType: text("service_type").notNull(),
   address: text("address").notNull(),
   scheduledDate: text("scheduled_date"),

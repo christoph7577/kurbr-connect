@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Phone, MessageSquare, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiGet } from "@/lib/apiClient";
@@ -20,20 +20,31 @@ const statusIndex = (s: string) => {
   return i >= 0 ? i : 0;
 };
 
+interface PublicJob {
+  jobNumber: string;
+  trackingToken: string;
+  status: string;
+  serviceType: string;
+  address: string;
+  scheduledDate: string | null;
+  scheduledTime: string | null;
+  priceCents: number | null;
+}
+
 const TrackingPage = () => {
   const [searchParams] = useSearchParams();
-  const jobParam = searchParams.get("job");
+  const tokenParam = searchParams.get("token");
 
-  const [jobNumber, setJobNumber] = useState(jobParam || "");
-  const [job, setJob] = useState<any | null>(null);
-  const [loading, setLoading] = useState(!!jobParam);
+  const [inputToken, setInputToken] = useState(tokenParam || "");
+  const [job, setJob] = useState<PublicJob | null>(null);
+  const [loading, setLoading] = useState(!!tokenParam);
   const [notFound, setNotFound] = useState(false);
 
-  const fetchJob = async (num: string) => {
+  const fetchJob = async (token: string) => {
     setLoading(true);
     setNotFound(false);
     try {
-      const data = await apiGet<any>(`/jobs/by-number/${num.toUpperCase()}`);
+      const data = await apiGet<PublicJob>(`/jobs/track/${token.trim()}`);
       setJob(data);
     } catch {
       setNotFound(true);
@@ -43,19 +54,18 @@ const TrackingPage = () => {
   };
 
   useEffect(() => {
-    if (jobParam) fetchJob(jobParam);
-  }, [jobParam]);
+    if (tokenParam) fetchJob(tokenParam);
+  }, [tokenParam]);
 
-  // Poll for status updates
+  // Poll for status updates every 15s
   useEffect(() => {
     if (!job) return;
-    const interval = setInterval(() => fetchJob(job.jobNumber), 15000);
+    const interval = setInterval(() => fetchJob(job.trackingToken), 15000);
     return () => clearInterval(interval);
-  }, [job?.jobNumber]);
+  }, [job?.trackingToken]);
 
   const currentStatus = job ? statusIndex(job.status) : 0;
 
-  // If no job loaded, show search
   if (!job && !loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -71,20 +81,27 @@ const TrackingPage = () => {
         </nav>
         <div className="flex-1 flex flex-col items-center justify-center px-6">
           <h2 className="text-3xl font-bold mb-2">Track Your Pickup</h2>
-          <p className="text-muted-foreground font-mono text-sm mb-8">Enter your job number to see live status</p>
+          <p className="text-muted-foreground font-mono text-sm mb-8">Enter your tracking code from the confirmation email</p>
           <div className="w-full max-w-sm space-y-4">
             <div className="relative">
               <Search className="absolute left-0 top-3 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
-                value={jobNumber}
-                onChange={(e) => setJobNumber(e.target.value)}
-                placeholder="JOB-2847"
-                className="w-full bg-transparent border-b-2 border-secondary focus:border-primary outline-none transition-colors py-2 pl-6 font-mono uppercase"
+                value={inputToken}
+                onChange={(e) => setInputToken(e.target.value)}
+                placeholder="Paste tracking code..."
+                className="w-full bg-transparent border-b-2 border-secondary focus:border-primary outline-none transition-colors py-2 pl-6 font-mono text-sm"
               />
             </div>
-            {notFound && <p className="text-destructive text-sm font-mono">Job not found. Check the number and try again.</p>}
-            <Button variant="default" className="w-full" onClick={() => fetchJob(jobNumber)} disabled={jobNumber.length < 3}>
+            {notFound && (
+              <p className="text-destructive text-sm font-mono">Tracking code not found. Check and try again.</p>
+            )}
+            <Button
+              variant="default"
+              className="w-full"
+              onClick={() => fetchJob(inputToken)}
+              disabled={inputToken.length < 8}
+            >
               Track Job
             </Button>
           </div>
@@ -116,8 +133,12 @@ const TrackingPage = () => {
         </nav>
 
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
-          {/* Status display */}
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={springBolt} className="text-center mb-16">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={springBolt}
+            className="text-center mb-16"
+          >
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-4">Status</p>
             <p className="text-5xl md:text-7xl font-mono font-bold tracking-tight text-foreground uppercase">
               {job!.status.replace("_", " ")}
@@ -127,25 +148,30 @@ const TrackingPage = () => {
             </p>
           </motion.div>
 
-          {/* Status Steps */}
           <div className="w-full max-w-md mb-16">
             <div className="flex items-center">
               {statuses.map((s, i) => (
                 <div key={s.id} className="flex items-center flex-1">
                   <div className="flex flex-col items-center">
-                    <div className={`w-3 h-3 rounded-full transition-colors ${i <= currentStatus ? 'bg-primary' : 'bg-secondary'}`} />
-                    <p className={`text-[10px] mt-2 uppercase tracking-widest ${i <= currentStatus ? 'text-primary' : 'text-muted-foreground'}`}>{s.label}</p>
+                    <div className={`w-3 h-3 rounded-full transition-colors ${i <= currentStatus ? "bg-primary" : "bg-secondary"}`} />
+                    <p className={`text-[10px] mt-2 uppercase tracking-widest ${i <= currentStatus ? "text-primary" : "text-muted-foreground"}`}>
+                      {s.label}
+                    </p>
                   </div>
                   {i < statuses.length - 1 && (
-                    <div className={`h-px flex-1 mx-1 transition-colors ${i < currentStatus ? 'bg-primary' : 'bg-secondary'}`} />
+                    <div className={`h-px flex-1 mx-1 transition-colors ${i < currentStatus ? "bg-primary" : "bg-secondary"}`} />
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Job Info */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springBolt, delay: 0.2 }} className="w-full max-w-md glass p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...springBolt, delay: 0.2 }}
+            className="w-full max-w-md glass p-6"
+          >
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-xs uppercase tracking-widest text-muted-foreground">Service</span>
@@ -155,7 +181,7 @@ const TrackingPage = () => {
                 <span className="text-xs uppercase tracking-widest text-muted-foreground">Address</span>
                 <span className="font-mono text-sm text-right max-w-[200px]">{job!.address}</span>
               </div>
-              {job!.priceCents && (
+              {job!.priceCents != null && (
                 <div className="flex justify-between">
                   <span className="text-xs uppercase tracking-widest text-muted-foreground">Price</span>
                   <span className="font-mono text-sm font-bold text-primary">${(job!.priceCents / 100).toFixed(0)}</span>

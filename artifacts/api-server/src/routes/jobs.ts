@@ -40,14 +40,24 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
   }
 });
 
-// GET /api/jobs/by-number/:jobNumber — public (customer tracking)
-router.get("/jobs/by-number/:jobNumber", async (req: Request, res: Response): Promise<void> => {
+// GET /api/jobs/track/:token — public (customer tracking by high-entropy token)
+// Returns only public-safe fields: no PII (customerEmail/Phone/Name excluded)
+router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<void> => {
   try {
-    const jobNumber = String(req.params["jobNumber"]).toUpperCase();
+    const token = String(req.params["token"]);
     const [job] = await db
-      .select()
+      .select({
+        jobNumber: jobsTable.jobNumber,
+        trackingToken: jobsTable.trackingToken,
+        status: jobsTable.status,
+        serviceType: jobsTable.serviceType,
+        address: jobsTable.address,
+        scheduledDate: jobsTable.scheduledDate,
+        scheduledTime: jobsTable.scheduledTime,
+        priceCents: jobsTable.priceCents,
+      })
       .from(jobsTable)
-      .where(eq(jobsTable.jobNumber, jobNumber))
+      .where(eq(jobsTable.trackingToken, token))
       .limit(1);
     if (!job) {
       res.status(404).json({ error: "Not found" });

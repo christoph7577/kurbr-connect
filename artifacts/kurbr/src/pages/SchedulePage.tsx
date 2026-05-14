@@ -53,7 +53,7 @@ const SchedulePage = () => {
         priceCents: estimatedPrice,
       });
       toast.success("Booking confirmed!");
-      navigate(`/tracking?job=${job.jobNumber}`);
+      navigate(`/tracking?token=${job.trackingToken}`);
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to create booking. Please try again.");
