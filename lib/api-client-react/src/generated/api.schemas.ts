@@ -42,6 +42,7 @@ export interface Job {
   photos?: string[] | null;
   /** @nullable */
   aiEstimate?: JobAiEstimate;
+  smsOptIn?: boolean;
   status: string;
   createdAt: string;
   updatedAt?: string;

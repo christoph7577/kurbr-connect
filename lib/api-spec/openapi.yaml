@@ -329,6 +329,7 @@ components:
         aiEstimate:
           type: ["object", "null"]
           additionalProperties: true
+        smsOptIn: { type: boolean }
         status: { type: string }
         createdAt: { type: string }
         updatedAt: { type: string }
