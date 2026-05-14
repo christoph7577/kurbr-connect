@@ -8,7 +8,6 @@
 import type { HaulerInputDocumentsItem } from "./haulerInputDocumentsItem";
 
 export interface HaulerInput {
-  userId: string;
   businessName?: string;
   licenseNumber?: string;
   vehicleType: string;

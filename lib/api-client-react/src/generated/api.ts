@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AiEstimate,
+  EstimateRequest,
   Hauler,
   HaulerInput,
   HaulerUpdate,
@@ -27,6 +29,7 @@ import type {
   JobUpdate,
   ListHaulersParams,
   ListJobsParams,
+  PublicJobStatus,
   UserProfile,
 } from "./api.schemas";
 
@@ -458,34 +461,34 @@ export const useUpdateJob = <
 };
 
 /**
- * @summary Get a job by job number
+ * @summary Public tracking by token
  */
-export const getGetJobByNumberUrl = (jobNumber: string) => {
-  return `/api/jobs/by-number/${jobNumber}`;
+export const getTrackJobUrl = (token: string) => {
+  return `/api/jobs/track/${token}`;
 };
 
-export const getJobByNumber = async (
-  jobNumber: string,
+export const trackJob = async (
+  token: string,
   options?: RequestInit,
-): Promise<Job> => {
-  return customFetch<Job>(getGetJobByNumberUrl(jobNumber), {
+): Promise<PublicJobStatus> => {
+  return customFetch<PublicJobStatus>(getTrackJobUrl(token), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetJobByNumberQueryKey = (jobNumber: string) => {
-  return [`/api/jobs/by-number/${jobNumber}`] as const;
+export const getTrackJobQueryKey = (token: string) => {
+  return [`/api/jobs/track/${token}`] as const;
 };
 
-export const getGetJobByNumberQueryOptions = <
-  TData = Awaited<ReturnType<typeof getJobByNumber>>,
+export const getTrackJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof trackJob>>,
   TError = ErrorType<void>,
 >(
-  jobNumber: string,
+  token: string,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getJobByNumber>>,
+      Awaited<ReturnType<typeof trackJob>>,
       TError,
       TData
     >;
@@ -494,49 +497,46 @@ export const getGetJobByNumberQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetJobByNumberQueryKey(jobNumber);
+  const queryKey = queryOptions?.queryKey ?? getTrackJobQueryKey(token);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getJobByNumber>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof trackJob>>> = ({
     signal,
-  }) => getJobByNumber(jobNumber, { signal, ...requestOptions });
+  }) => trackJob(token, { signal, ...requestOptions });
 
   return {
     queryKey,
     queryFn,
-    enabled: !!jobNumber,
+    enabled: !!token,
     ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getJobByNumber>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
+  } as UseQueryOptions<Awaited<ReturnType<typeof trackJob>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
 };
 
-export type GetJobByNumberQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getJobByNumber>>
+export type TrackJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof trackJob>>
 >;
-export type GetJobByNumberQueryError = ErrorType<void>;
+export type TrackJobQueryError = ErrorType<void>;
 
 /**
- * @summary Get a job by job number
+ * @summary Public tracking by token
  */
 
-export function useGetJobByNumber<
-  TData = Awaited<ReturnType<typeof getJobByNumber>>,
+export function useTrackJob<
+  TData = Awaited<ReturnType<typeof trackJob>>,
   TError = ErrorType<void>,
 >(
-  jobNumber: string,
+  token: string,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getJobByNumber>>,
+      Awaited<ReturnType<typeof trackJob>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetJobByNumberQueryOptions(jobNumber, options);
+  const queryOptions = getTrackJobQueryOptions(token, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -617,6 +617,92 @@ export function useGetJobStats<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get AI-powered price estimate for a job
+ */
+export const getEstimateJobPriceUrl = () => {
+  return `/api/jobs/estimate`;
+};
+
+export const estimateJobPrice = async (
+  estimateRequest: EstimateRequest,
+  options?: RequestInit,
+): Promise<AiEstimate> => {
+  return customFetch<AiEstimate>(getEstimateJobPriceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateRequest),
+  });
+};
+
+export const getEstimateJobPriceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof estimateJobPrice>>,
+    TError,
+    { data: BodyType<EstimateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof estimateJobPrice>>,
+  TError,
+  { data: BodyType<EstimateRequest> },
+  TContext
+> => {
+  const mutationKey = ["estimateJobPrice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof estimateJobPrice>>,
+    { data: BodyType<EstimateRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return estimateJobPrice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EstimateJobPriceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof estimateJobPrice>>
+>;
+export type EstimateJobPriceMutationBody = BodyType<EstimateRequest>;
+export type EstimateJobPriceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get AI-powered price estimate for a job
+ */
+export const useEstimateJobPrice = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof estimateJobPrice>>,
+    TError,
+    { data: BodyType<EstimateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof estimateJobPrice>>,
+  TError,
+  { data: BodyType<EstimateRequest> },
+  TContext
+> => {
+  return useMutation(getEstimateJobPriceMutationOptions(options));
+};
 
 /**
  * @summary List all hauler profiles

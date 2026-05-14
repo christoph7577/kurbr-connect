@@ -116,24 +116,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Job"
 
-  /jobs/by-number/{jobNumber}:
+  /jobs/track/{token}:
     get:
-      operationId: getJobByNumber
+      operationId: trackJob
       tags: [jobs]
-      summary: Get a job by job number
+      summary: Public tracking by token
       parameters:
         - in: path
-          name: jobNumber
+          name: token
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: Job
+          description: Public job status
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Job"
+                $ref: "#/components/schemas/PublicJobStatus"
         "404":
           description: Not found
 
@@ -149,6 +149,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobStats"
+
+  /jobs/estimate:
+    post:
+      operationId: estimateJobPrice
+      tags: [jobs]
+      summary: Get AI-powered price estimate for a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EstimateRequest"
+      responses:
+        "200":
+          description: AI price estimate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiEstimate"
 
   /haulers:
     get:
@@ -258,6 +277,7 @@ components:
       properties:
         id: { type: string }
         jobNumber: { type: string }
+        trackingToken: { type: string }
         serviceType: { type: string }
         address: { type: string }
         scheduledDate: { type: ["string", "null"] }
@@ -269,9 +289,28 @@ components:
         customerId: { type: ["string", "null"] }
         haulerId: { type: ["string", "null"] }
         priceCents: { type: ["integer", "null"] }
+        photos:
+          type: ["array", "null"]
+          items: { type: string }
+        aiEstimate:
+          type: ["object", "null"]
+          additionalProperties: true
         status: { type: string }
         createdAt: { type: string }
         updatedAt: { type: string }
+
+    PublicJobStatus:
+      type: object
+      required: [jobNumber, trackingToken, status, serviceType, address]
+      properties:
+        jobNumber: { type: string }
+        trackingToken: { type: string }
+        status: { type: string }
+        serviceType: { type: string }
+        address: { type: string }
+        scheduledDate: { type: ["string", "null"] }
+        scheduledTime: { type: ["string", "null"] }
+        priceCents: { type: ["integer", "null"] }
 
     JobInput:
       type: object
@@ -286,6 +325,12 @@ components:
         customerEmail: { type: string }
         customerPhone: { type: string }
         priceCents: { type: integer }
+        photos:
+          type: array
+          items: { type: string }
+        aiEstimate:
+          type: object
+          additionalProperties: true
 
     JobUpdate:
       type: object
@@ -296,16 +341,62 @@ components:
         scheduledTime: { type: string }
         description: { type: string }
         priceCents: { type: integer }
+        photos:
+          type: array
+          items: { type: string }
+        aiEstimate:
+          type: object
+          additionalProperties: true
 
     JobStats:
       type: object
-      required: [total, active, unassigned, completed, todayRevenueCents]
+      required: [total, active, unassigned, completed, todayRevenueCents, activeHaulers, dailyRevenue]
       properties:
         total: { type: integer }
         active: { type: integer }
         unassigned: { type: integer }
         completed: { type: integer }
         todayRevenueCents: { type: integer }
+        activeHaulers: { type: integer }
+        dailyRevenue:
+          type: array
+          items:
+            type: object
+            required: [date, totalCents]
+            properties:
+              date: { type: string }
+              totalCents: { type: integer }
+
+    PhotoUploadResponse:
+      type: object
+      required: [urls]
+      properties:
+        urls:
+          type: array
+          items: { type: string }
+
+    EstimateRequest:
+      type: object
+      required: [photoUrls, serviceType]
+      properties:
+        photoUrls:
+          type: array
+          items: { type: string }
+        serviceType: { type: string }
+        description: { type: string }
+
+    AiEstimate:
+      type: object
+      required: [estimated_volume, item_list, difficulty_score, price_min, price_max, price_estimated]
+      properties:
+        estimated_volume: { type: string }
+        item_list:
+          type: array
+          items: { type: string }
+        difficulty_score: { type: integer }
+        price_min: { type: integer }
+        price_max: { type: integer }
+        price_estimated: { type: integer }
 
     Hauler:
       type: object
@@ -329,9 +420,8 @@ components:
 
     HaulerInput:
       type: object
-      required: [userId, vehicleType, vehiclePlate, serviceAreas]
+      required: [vehicleType, vehiclePlate, serviceAreas]
       properties:
-        userId: { type: string }
         businessName: { type: string }
         licenseNumber: { type: string }
         vehicleType: { type: string }

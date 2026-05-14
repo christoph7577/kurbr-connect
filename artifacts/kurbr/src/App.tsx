@@ -5,10 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-// Clerk auth wired via ClerkProvider in main.tsx
 import LandingPage from "./pages/LandingPage";
 import SchedulePage from "./pages/SchedulePage";
 import AdminPage from "./pages/AdminPage";
+import DispatchDashboard from "./pages/DispatchDashboard";
 import TrackingPage from "./pages/TrackingPage";
 import HaulerOnboardingPage from "./pages/HaulerOnboardingPage";
 import LoginPage from "./pages/LoginPage";
@@ -33,6 +33,11 @@ const App = () => (
             <Route path="/admin" element={
               <ProtectedRoute requireAdmin>
                 <AdminPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/dispatch" element={
+              <ProtectedRoute requireAdmin>
+                <DispatchDashboard />
               </ProtectedRoute>
             } />
             <Route path="/tracking" element={<TrackingPage />} />

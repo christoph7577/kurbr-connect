@@ -5,6 +5,7 @@
  * KURBR API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { JobStatsDailyRevenueItem } from "./jobStatsDailyRevenueItem";
 
 export interface JobStats {
   total: number;
@@ -12,4 +13,6 @@ export interface JobStats {
   unassigned: number;
   completed: number;
   todayRevenueCents: number;
+  activeHaulers: number;
+  dailyRevenue: JobStatsDailyRevenueItem[];
 }

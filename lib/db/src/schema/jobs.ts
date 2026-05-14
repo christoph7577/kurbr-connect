@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -27,6 +27,8 @@ export const jobsTable = pgTable("jobs", {
   customerId: text("customer_id"),
   haulerId: text("hauler_id").references(() => haulerProfilesTable.id),
   priceCents: integer("price_cents"),
+  photos: text("photos").array(),
+  aiEstimate: jsonb("ai_estimate"),
   status: jobStatusEnum("status").default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

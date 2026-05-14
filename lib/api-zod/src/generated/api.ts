@@ -26,6 +26,7 @@ export const ListJobsQueryParams = zod.object({
 export const ListJobsResponseItem = zod.object({
   id: zod.string(),
   jobNumber: zod.string(),
+  trackingToken: zod.string().optional(),
   serviceType: zod.string(),
   address: zod.string(),
   scheduledDate: zod.string().nullish(),
@@ -37,6 +38,8 @@ export const ListJobsResponseItem = zod.object({
   customerId: zod.string().nullish(),
   haulerId: zod.string().nullish(),
   priceCents: zod.number().nullish(),
+  photos: zod.array(zod.string()).nullish(),
+  aiEstimate: zod.record(zod.string(), zod.unknown()).nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
@@ -56,6 +59,8 @@ export const CreateJobBody = zod.object({
   customerEmail: zod.string().optional(),
   customerPhone: zod.string().optional(),
   priceCents: zod.number().optional(),
+  photos: zod.array(zod.string()).optional(),
+  aiEstimate: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 /**
@@ -68,6 +73,7 @@ export const GetJobParams = zod.object({
 export const GetJobResponse = zod.object({
   id: zod.string(),
   jobNumber: zod.string(),
+  trackingToken: zod.string().optional(),
   serviceType: zod.string(),
   address: zod.string(),
   scheduledDate: zod.string().nullish(),
@@ -79,6 +85,8 @@ export const GetJobResponse = zod.object({
   customerId: zod.string().nullish(),
   haulerId: zod.string().nullish(),
   priceCents: zod.number().nullish(),
+  photos: zod.array(zod.string()).nullish(),
+  aiEstimate: zod.record(zod.string(), zod.unknown()).nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
@@ -98,11 +106,14 @@ export const UpdateJobBody = zod.object({
   scheduledTime: zod.string().optional(),
   description: zod.string().optional(),
   priceCents: zod.number().optional(),
+  photos: zod.array(zod.string()).optional(),
+  aiEstimate: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const UpdateJobResponse = zod.object({
   id: zod.string(),
   jobNumber: zod.string(),
+  trackingToken: zod.string().optional(),
   serviceType: zod.string(),
   address: zod.string(),
   scheduledDate: zod.string().nullish(),
@@ -114,35 +125,29 @@ export const UpdateJobResponse = zod.object({
   customerId: zod.string().nullish(),
   haulerId: zod.string().nullish(),
   priceCents: zod.number().nullish(),
+  photos: zod.array(zod.string()).nullish(),
+  aiEstimate: zod.record(zod.string(), zod.unknown()).nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
 });
 
 /**
- * @summary Get a job by job number
+ * @summary Public tracking by token
  */
-export const GetJobByNumberParams = zod.object({
-  jobNumber: zod.coerce.string(),
+export const TrackJobParams = zod.object({
+  token: zod.coerce.string(),
 });
 
-export const GetJobByNumberResponse = zod.object({
-  id: zod.string(),
+export const TrackJobResponse = zod.object({
   jobNumber: zod.string(),
+  trackingToken: zod.string(),
+  status: zod.string(),
   serviceType: zod.string(),
   address: zod.string(),
   scheduledDate: zod.string().nullish(),
   scheduledTime: zod.string().nullish(),
-  description: zod.string().nullish(),
-  customerName: zod.string().nullish(),
-  customerEmail: zod.string().nullish(),
-  customerPhone: zod.string().nullish(),
-  customerId: zod.string().nullish(),
-  haulerId: zod.string().nullish(),
   priceCents: zod.number().nullish(),
-  status: zod.string(),
-  createdAt: zod.string(),
-  updatedAt: zod.string().optional(),
 });
 
 /**
@@ -154,6 +159,31 @@ export const GetJobStatsResponse = zod.object({
   unassigned: zod.number(),
   completed: zod.number(),
   todayRevenueCents: zod.number(),
+  activeHaulers: zod.number(),
+  dailyRevenue: zod.array(
+    zod.object({
+      date: zod.string(),
+      totalCents: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get AI-powered price estimate for a job
+ */
+export const EstimateJobPriceBody = zod.object({
+  photoUrls: zod.array(zod.string()),
+  serviceType: zod.string(),
+  description: zod.string().optional(),
+});
+
+export const EstimateJobPriceResponse = zod.object({
+  estimated_volume: zod.string(),
+  item_list: zod.array(zod.string()),
+  difficulty_score: zod.number(),
+  price_min: zod.number(),
+  price_max: zod.number(),
+  price_estimated: zod.number(),
 });
 
 /**
@@ -186,7 +216,6 @@ export const ListHaulersResponse = zod.array(ListHaulersResponseItem);
  * @summary Create a hauler profile
  */
 export const CreateHaulerBody = zod.object({
-  userId: zod.string(),
   businessName: zod.string().optional(),
   licenseNumber: zod.string().optional(),
   vehicleType: zod.string(),

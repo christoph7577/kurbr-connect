@@ -1,43 +1,88 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Bell, Menu, Loader2 } from "lucide-react";
+import { Search, Bell, Menu, Loader2, Download, TrendingUp, ExternalLink, CheckCircle, Mail } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
-import { StatsGrid } from "@/components/admin/StatsGrid";
 import { JobQueue, type Job } from "@/components/admin/JobQueue";
 import { JobDetail } from "@/components/admin/JobDetail";
 import { HaulerManagement } from "@/components/admin/HaulerManagement";
-import { apiGet } from "@/lib/apiClient";
+import { apiGet, apiPatch } from "@/lib/apiClient";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 
-const mapJob = (j: any): Job => ({
-  id: j.jobNumber,
-  dbId: j.id,
-  customer: j.customerName || "Unknown",
-  address: j.address,
-  status: j.status,
-  hauler: j.haulerId ? "Assigned" : "Unassigned",
-  haulerId: j.haulerId,
-  eta: j.scheduledTime || "—",
-  price: j.priceCents ? `$${(j.priceCents / 100).toFixed(0)}` : "—",
-  priceCents: j.priceCents,
-  description: j.description,
-  customerEmail: j.customerEmail,
-  customerPhone: j.customerPhone,
-  scheduledDate: j.scheduledDate,
+const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
+
+interface JobStats {
+  total: number;
+  active: number;
+  unassigned: number;
+  completed: number;
+  todayRevenueCents: number;
+  totalRevenueCents: number;
+  activeHaulers: number;
+  dailyRevenue: Array<{ date: string; totalCents: number }>;
+}
+
+const STATUS_FILTERS = ["all", "pending", "confirmed", "dispatched", "en_route", "arrived", "completed", "cancelled"] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+const mapJob = (j: Record<string, unknown>): Job => ({
+  id: j["jobNumber"] as string,
+  dbId: j["id"] as string,
+  customer: (j["customerName"] as string) || "Unknown",
+  address: j["address"] as string,
+  status: j["status"] as string,
+  hauler: j["haulerId"] ? "Assigned" : "Unassigned",
+  haulerId: (j["haulerId"] as string) || null,
+  eta: (j["scheduledTime"] as string) || "—",
+  price: j["priceCents"] ? `$${((j["priceCents"] as number) / 100).toFixed(0)}` : "—",
+  priceCents: (j["priceCents"] as number) || null,
+  description: (j["description"] as string) || null,
+  customerEmail: (j["customerEmail"] as string) || null,
+  customerPhone: (j["customerPhone"] as string) || null,
+  scheduledDate: (j["scheduledDate"] as string) || null,
 });
+
+function exportCsv(jobs: Job[]) {
+  const headers = ["Job #", "Customer", "Address", "Status", "Hauler", "Date", "Time", "Price", "Email", "Phone"];
+  const rows = jobs.map((j) => [
+    j.id, j.customer, j.address, j.status,
+    j.hauler, j.scheduledDate || "", j.eta,
+    j.priceCents ? (j.priceCents / 100).toFixed(2) : "",
+    j.customerEmail || "", j.customerPhone || "",
+  ]);
+  const csv = [headers, ...rows]
+    .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `kurbr-jobs-${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const AdminPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>("dashboard");
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [stats, setStats] = useState<JobStats | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [showChart, setShowChart] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     try {
-      const data = await apiGet<any[]>("/jobs");
+      const [data, statsData] = await Promise.all([
+        apiGet<Record<string, unknown>[]>("/jobs"),
+        apiGet<JobStats>("/jobs/stats"),
+      ]);
       const mapped = data.map(mapJob);
       setJobs(mapped);
+      setStats(statsData);
       if (selectedJob) {
         const updated = mapped.find((j) => j.dbId === selectedJob.dbId);
         if (updated) setSelectedJob(updated);
@@ -61,24 +106,34 @@ const AdminPage = () => {
     setShowDetail(true);
   };
 
-  const filteredJobs = searchQuery
-    ? jobs.filter((j) =>
-        j.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        j.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        j.address.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : jobs;
-
-  const activeCount = jobs.filter((j) => !["completed", "cancelled"].includes(j.status)).length;
-  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status)).length;
-  const todayRevenue = jobs.reduce((sum, j) => sum + (j.priceCents || 0), 0);
-
-  const stats = {
-    activeJobs: activeCount.toString(),
-    unassigned: unassignedCount.toString(),
-    totalJobs: jobs.length.toString(),
-    todayRevenue: `$${(todayRevenue / 100).toLocaleString()}`,
+  const handleMarkComplete = async (job: Job) => {
+    try {
+      await apiPatch(`/jobs/${job.dbId}`, { status: "completed" });
+      toast.success(`${job.id} marked complete`);
+      await fetchJobs();
+    } catch {
+      toast.error("Failed to update");
+    }
   };
+
+  const filteredJobs = jobs.filter((j) => {
+    const matchesStatus = statusFilter === "all" || j.status === statusFilter;
+    const matchesSearch = !searchQuery || (
+      j.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      j.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      j.address.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    return matchesStatus && matchesSearch;
+  });
+
+  const chartData = (stats?.dailyRevenue ?? [])
+    .slice(-14)
+    .map((d) => ({
+      date: d.date.slice(5),
+      revenue: d.totalCents / 100,
+    }));
+
+  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status)).length;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -102,6 +157,18 @@ const AdminPage = () => {
             <span className="md:hidden text-lg font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></span>
           </div>
           <div className="flex items-center gap-3 md:gap-4">
+            <button
+              onClick={() => exportCsv(filteredJobs)}
+              className="hidden md:flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+            <button
+              onClick={() => setShowChart((v) => !v)}
+              className={`hidden md:flex items-center gap-2 text-xs font-mono uppercase tracking-widest transition-colors ${showChart ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <TrendingUp className="w-4 h-4" /> Revenue
+            </button>
             <button className="relative">
               <Bell className="w-5 h-5 text-muted-foreground" />
               {unassignedCount > 0 && <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />}
@@ -119,8 +186,85 @@ const AdminPage = () => {
             </div>
           ) : (
             <>
-              <StatsGrid stats={stats} />
+              {/* Stats Grid */}
+              {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+                  {[
+                    { label: "Total Jobs", value: stats.total, mono: stats.total.toString() },
+                    { label: "Active Jobs", value: stats.active, mono: stats.active.toString() },
+                    { label: "Active Haulers", value: stats.activeHaulers, mono: stats.activeHaulers.toString() },
+                    {
+                      label: "Total Revenue",
+                      value: stats.totalRevenueCents,
+                      mono: `$${(stats.totalRevenueCents / 100).toLocaleString()}`,
+                    },
+                  ].map((s, i) => (
+                    <motion.div
+                      key={s.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...springBolt, delay: i * 0.05 }}
+                      className="border-milled p-4 md:p-5"
+                    >
+                      <p className="text-xl md:text-2xl font-mono font-bold">{s.mono}</p>
+                      <p className="text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.label}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
 
+              {/* Revenue Chart */}
+              {showChart && chartData.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="border-milled p-4 mb-6"
+                >
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4 font-mono">Revenue — Last 14 Days</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 0, fontFamily: "var(--font-mono)", fontSize: 12 }}
+                        formatter={(v: number) => [`$${v.toFixed(0)}`, "Revenue"]}
+                        labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                        cursor={{ fill: "hsl(var(--secondary))" }}
+                      />
+                      <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={0} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              )}
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-4 scrollbar-none">
+                {STATUS_FILTERS.map((s) => {
+                  const count = s === "all" ? jobs.length : jobs.filter((j) => j.status === s).length;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setStatusFilter(s)}
+                      className={`flex-none px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors whitespace-nowrap ${
+                        statusFilter === s
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s} ({count})
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => exportCsv(filteredJobs)}
+                  className="md:hidden flex-none ml-auto flex items-center gap-1 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest bg-secondary text-muted-foreground"
+                >
+                  <Download className="w-3 h-3" /> CSV
+                </button>
+              </div>
+
+              {/* Mobile view */}
               <div className="md:hidden">
                 {showDetail && selectedJob ? (
                   <div>
@@ -134,11 +278,84 @@ const AdminPage = () => {
                 )}
               </div>
 
+              {/* Desktop view */}
               <div className="hidden md:grid grid-cols-3 gap-6">
                 <div className="col-span-2">
-                  <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
+                  {/* Quick action table */}
+                  {filteredJobs.length > 0 ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono">{filteredJobs.length} jobs</p>
+                      </div>
+                      <div className="border-milled divide-y divide-border">
+                        {filteredJobs.slice(0, 30).map((job) => (
+                          <div
+                            key={job.dbId}
+                            className={`flex items-center justify-between p-3 group cursor-pointer hover:bg-secondary/20 transition-colors ${selectedJob?.dbId === job.dbId ? "bg-secondary/20" : ""}`}
+                            onClick={() => handleSelectJob(job)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono text-xs font-bold w-24 shrink-0">{job.id}</span>
+                              <span className="text-sm truncate">{job.customer}</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="font-mono text-xs text-primary">{job.price}</span>
+                              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 ${
+                                job.status === "completed" ? "bg-green-500/20 text-green-500" :
+                                job.status === "cancelled" ? "bg-destructive/20 text-destructive" :
+                                job.status.includes("route") || job.status === "dispatched" ? "bg-primary/20 text-primary" :
+                                "bg-secondary text-muted-foreground"
+                              }`}>
+                                {job.status.replace("_", " ")}
+                              </span>
+                              {/* Quick actions */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {job.customerEmail && (
+                                  <a
+                                    href={`mailto:${job.customerEmail}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1 hover:bg-secondary rounded transition-colors"
+                                    title="Email customer"
+                                  >
+                                    <Mail className="w-3 h-3 text-muted-foreground" />
+                                  </a>
+                                )}
+                                {!["completed", "cancelled"].includes(job.status) && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(job); }}
+                                    className="p-1 hover:bg-green-500/20 rounded transition-colors"
+                                    title="Mark complete"
+                                  >
+                                    <CheckCircle className="w-3 h-3 text-muted-foreground hover:text-green-500" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleSelectJob(job); }}
+                                  className="p-1 hover:bg-secondary rounded transition-colors"
+                                  title="View details"
+                                >
+                                  <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {filteredJobs.length > 30 && (
+                        <p className="text-xs text-muted-foreground font-mono text-center mt-3">
+                          Showing 30 of {filteredJobs.length} jobs
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 text-muted-foreground">
+                      <p className="font-mono text-sm">No jobs found</p>
+                    </div>
+                  )}
                 </div>
-                {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} />}
+                <div>
+                  {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} />}
+                </div>
               </div>
             </>
           )}

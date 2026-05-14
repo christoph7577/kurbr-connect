@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { LayoutDashboard, Truck, Users, LogOut, X } from "lucide-react";
+import { LayoutDashboard, Truck, Users, LogOut, X, Radio } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
-export type AdminView = "dashboard" | "haulers";
+export type AdminView = "dashboard" | "haulers" | "dispatch";
 
 interface AdminSidebarProps {
   open: boolean;
@@ -11,22 +12,26 @@ interface AdminSidebarProps {
   onChangeView: (view: AdminView) => void;
 }
 
-const navItems: { icon: typeof LayoutDashboard; label: string; view: AdminView }[] = [
+const navItems: { icon: typeof LayoutDashboard; label: string; view: AdminView; href?: string }[] = [
   { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
+  { icon: Radio, label: "Dispatch", view: "dispatch", href: "/dispatch" },
   { icon: Users, label: "Haulers", view: "haulers" },
 ];
 
 export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminSidebarProps) => {
   const { signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const handleNav = (view: AdminView) => {
-    onChangeView(view);
+  const handleNav = (item: typeof navItems[number]) => {
+    onChangeView(item.view);
     onClose();
+    if (item.href) {
+      navigate(item.href);
+    }
   };
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && <div className="fixed inset-0 bg-background/80 z-40 md:hidden" onClick={onClose} />}
 
       <aside className={`${open ? "fixed" : "hidden"} md:relative md:flex z-50 w-60 bg-sidebar border-r border-sidebar-border flex-col shrink-0 h-full`}>
@@ -42,7 +47,7 @@ export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminS
           {navItems.map((item) => (
             <button
               key={item.view}
-              onClick={() => handleNav(item.view)}
+              onClick={() => handleNav(item)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm mb-1 transition-colors ${
                 activeView === item.view
                   ? "bg-sidebar-accent text-sidebar-primary"

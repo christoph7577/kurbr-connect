@@ -9,9 +9,15 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * @nullable
+ */
+export type JobAiEstimate = { [key: string]: unknown } | null;
+
 export interface Job {
   id: string;
   jobNumber: string;
+  trackingToken?: string;
   serviceType: string;
   address: string;
   /** @nullable */
@@ -32,10 +38,30 @@ export interface Job {
   haulerId?: string | null;
   /** @nullable */
   priceCents?: number | null;
+  /** @nullable */
+  photos?: string[] | null;
+  /** @nullable */
+  aiEstimate?: JobAiEstimate;
   status: string;
   createdAt: string;
   updatedAt?: string;
 }
+
+export interface PublicJobStatus {
+  jobNumber: string;
+  trackingToken: string;
+  status: string;
+  serviceType: string;
+  address: string;
+  /** @nullable */
+  scheduledDate?: string | null;
+  /** @nullable */
+  scheduledTime?: string | null;
+  /** @nullable */
+  priceCents?: number | null;
+}
+
+export type JobInputAiEstimate = { [key: string]: unknown };
 
 export interface JobInput {
   serviceType: string;
@@ -47,7 +73,11 @@ export interface JobInput {
   customerEmail?: string;
   customerPhone?: string;
   priceCents?: number;
+  photos?: string[];
+  aiEstimate?: JobInputAiEstimate;
 }
+
+export type JobUpdateAiEstimate = { [key: string]: unknown };
 
 export interface JobUpdate {
   status?: string;
@@ -57,7 +87,14 @@ export interface JobUpdate {
   scheduledTime?: string;
   description?: string;
   priceCents?: number;
+  photos?: string[];
+  aiEstimate?: JobUpdateAiEstimate;
 }
+
+export type JobStatsDailyRevenueItem = {
+  date: string;
+  totalCents: number;
+};
 
 export interface JobStats {
   total: number;
@@ -65,6 +102,27 @@ export interface JobStats {
   unassigned: number;
   completed: number;
   todayRevenueCents: number;
+  activeHaulers: number;
+  dailyRevenue: JobStatsDailyRevenueItem[];
+}
+
+export interface PhotoUploadResponse {
+  urls: string[];
+}
+
+export interface EstimateRequest {
+  photoUrls: string[];
+  serviceType: string;
+  description?: string;
+}
+
+export interface AiEstimate {
+  estimated_volume: string;
+  item_list: string[];
+  difficulty_score: number;
+  price_min: number;
+  price_max: number;
+  price_estimated: number;
 }
 
 export interface Hauler {
@@ -99,7 +157,6 @@ export type HaulerInputDocumentsItem = {
 };
 
 export interface HaulerInput {
-  userId: string;
   businessName?: string;
   licenseNumber?: string;
   vehicleType: string;

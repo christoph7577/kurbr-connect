@@ -5,10 +5,12 @@
  * KURBR API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { JobAiEstimate } from "./jobAiEstimate";
 
 export interface Job {
   id: string;
   jobNumber: string;
+  trackingToken?: string;
   serviceType: string;
   address: string;
   /** @nullable */
@@ -29,6 +31,10 @@ export interface Job {
   haulerId?: string | null;
   /** @nullable */
   priceCents?: number | null;
+  /** @nullable */
+  photos?: string[] | null;
+  /** @nullable */
+  aiEstimate?: JobAiEstimate;
   status: string;
   createdAt: string;
   updatedAt?: string;

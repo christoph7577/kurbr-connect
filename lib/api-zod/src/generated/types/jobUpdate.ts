@@ -5,6 +5,7 @@
  * KURBR API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { JobUpdateAiEstimate } from "./jobUpdateAiEstimate";
 
 export interface JobUpdate {
   status?: string;
@@ -14,4 +15,6 @@ export interface JobUpdate {
   scheduledTime?: string;
   description?: string;
   priceCents?: number;
+  photos?: string[];
+  aiEstimate?: JobUpdateAiEstimate;
 }
