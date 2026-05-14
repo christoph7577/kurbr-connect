@@ -88,6 +88,20 @@ export default function HaulerDashboardScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
+  const normalizePhone = (phone: string) => phone.replace(/\s+/g, "").trim();
+
+  const handleCall = (phone: string) => {
+    Linking.openURL(`tel:${normalizePhone(phone)}`).catch(() => {
+      Alert.alert("Cannot place call", "Unable to open the phone dialer on this device.");
+    });
+  };
+
+  const handleText = (phone: string) => {
+    Linking.openURL(`sms:${normalizePhone(phone)}`).catch(() => {
+      Alert.alert("Cannot open messages", "Unable to open the SMS app on this device.");
+    });
+  };
+
   const handleNavigate = (address: string) => {
     const encoded = encodeURIComponent(address);
     const fallback = `https://maps.google.com/?q=${encoded}`;
@@ -404,6 +418,28 @@ export default function HaulerDashboardScreen() {
       color: colors.mutedForeground,
       textAlign: "center",
     },
+    contactBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 4,
+    },
+    callBtn: {
+      backgroundColor: "#22c55e",
+    },
+    textBtn: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: "transparent",
+    },
+    contactBtnText: {
+      fontSize: 12,
+      fontFamily: "Inter_700Bold",
+      color: "#fff",
+      letterSpacing: 0.3,
+    },
     divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
     totalCard: {
       backgroundColor: colors.primary + "15",
@@ -474,6 +510,28 @@ export default function HaulerDashboardScreen() {
               <View style={styles.detailRow}>
                 <Feather name="phone" size={15} color={colors.mutedForeground} />
                 <Text style={styles.detailText}>{item.customerPhone}</Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.contactBtn,
+                    styles.callBtn,
+                    pressed && { opacity: 0.75 },
+                  ]}
+                  onPress={() => handleCall(item.customerPhone!)}
+                >
+                  <Feather name="phone-call" size={13} color="#fff" />
+                  <Text style={styles.contactBtnText}>Call</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.contactBtn,
+                    styles.textBtn,
+                    pressed && { opacity: 0.75 },
+                  ]}
+                  onPress={() => handleText(item.customerPhone!)}
+                >
+                  <Feather name="message-square" size={13} color={colors.primary} />
+                  <Text style={[styles.contactBtnText, { color: colors.primary }]}>Text</Text>
+                </Pressable>
               </View>
             )}
             {item.priceCents != null && (
