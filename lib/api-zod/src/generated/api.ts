@@ -159,13 +159,22 @@ export const GetJobStatsResponse = zod.object({
   unassigned: zod.number(),
   completed: zod.number(),
   todayRevenueCents: zod.number(),
+  totalRevenueCents: zod.number(),
   activeHaulers: zod.number(),
+  jobsToday: zod.number(),
   dailyRevenue: zod.array(
     zod.object({
       date: zod.string(),
       totalCents: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary Upload photos for a job (multipart/form-data, field name "photos", ≤5 files, ≤5MB each, jpg/png/webp)
+ */
+export const UploadJobPhotosResponse = zod.object({
+  urls: zod.array(zod.string()),
 });
 
 /**

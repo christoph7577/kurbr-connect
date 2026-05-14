@@ -52,11 +52,13 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
       .filter((j) => j.status === "completed")
       .reduce((sum, j) => sum + (j.priceCents ?? 0), 0);
 
-    // Revenue from jobs created today
+    // Revenue from jobs created today + jobs today count
     const todayStr = new Date().toISOString().split("T")[0];
-    const todayRevenueCents = jobs
-      .filter((j) => j.status === "completed" && j.createdAt.toISOString().startsWith(todayStr))
+    const todayJobs = jobs.filter((j) => j.createdAt.toISOString().startsWith(todayStr));
+    const todayRevenueCents = todayJobs
+      .filter((j) => j.status === "completed")
       .reduce((sum, j) => sum + (j.priceCents ?? 0), 0);
+    const jobsToday = todayJobs.length;
 
     // Active haulers count
     const haulers = await db
@@ -86,7 +88,7 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
     }
     const dailyRevenue = Array.from(dailyRevenueMap.entries()).map(([date, totalCents]) => ({ date, totalCents }));
 
-    res.json({ total: jobs.length, active, unassigned, completed, todayRevenueCents, totalRevenueCents, activeHaulers, dailyRevenue });
+    res.json({ total: jobs.length, active, unassigned, completed, todayRevenueCents, totalRevenueCents, activeHaulers, jobsToday, dailyRevenue });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -258,7 +260,6 @@ Respond ONLY with valid JSON, no other text.`;
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
       estimate = JSON.parse(jsonMatch ? jsonMatch[0] : textBlock.text);
     } catch {
-      // Fallback estimate if parsing fails
       estimate = {
         estimated_volume: "1/2 truck",
         item_list: ["Mixed items"],
@@ -268,6 +269,28 @@ Respond ONLY with valid JSON, no other text.`;
         price_estimated: 18000,
       };
     }
+
+    // Enforce $18/cubic yard server-side pricing formula
+    // Truck capacity ~450 cu ft = ~17 cu yd; rate = $18/cu yd = ~$1,800/cu yd in cents
+    const RATE_CENTS_PER_CUYD = 1800; // $18.00/cu yd in cents
+    const VOLUME_MAP: Record<string, number> = {
+      "1/8 truck": 2, "1/4 truck": 4.25, "1/3 truck": 6,
+      "half truck": 8.5, "1/2 truck": 8.5, "3/4 truck": 12.75,
+      "full truck": 17, "1 truck": 17,
+    };
+    const vol = String(estimate["estimated_volume"] || "1/2 truck").toLowerCase();
+    let cuYards = 8.5; // default
+    for (const [k, v] of Object.entries(VOLUME_MAP)) {
+      if (vol.includes(k)) { cuYards = v; break; }
+    }
+    const difficulty = Math.min(5, Math.max(1, Number(estimate["difficulty_score"]) || 3));
+    const difficultyMultiplier = 1 + (difficulty - 1) * 0.1; // 1.0 – 1.4×
+    const baseCents = Math.round(cuYards * RATE_CENTS_PER_CUYD * difficultyMultiplier);
+    const minCents = Math.max(8900, Math.round(baseCents * 0.85));
+    const maxCents = Math.round(baseCents * 1.20);
+    estimate["price_min"] = minCents;
+    estimate["price_max"] = maxCents;
+    estimate["price_estimated"] = baseCents;
 
     res.json(estimate);
   } catch (err) {

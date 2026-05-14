@@ -13,6 +13,8 @@ export interface JobStats {
   unassigned: number;
   completed: number;
   todayRevenueCents: number;
+  totalRevenueCents: number;
   activeHaulers: number;
+  jobsToday: number;
   dailyRevenue: JobStatsDailyRevenueItem[];
 }

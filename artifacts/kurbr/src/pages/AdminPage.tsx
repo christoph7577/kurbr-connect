@@ -19,6 +19,7 @@ interface JobStats {
   todayRevenueCents: number;
   totalRevenueCents: number;
   activeHaulers: number;
+  jobsToday: number;
   dailyRevenue: Array<{ date: string; totalCents: number }>;
 }
 
@@ -191,10 +192,10 @@ const AdminPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
                   {[
                     { label: "Total Jobs", value: stats.total, mono: stats.total.toString() },
-                    { label: "Active Jobs", value: stats.active, mono: stats.active.toString() },
+                    { label: "Jobs Today", value: stats.jobsToday, mono: stats.jobsToday.toString() },
                     { label: "Active Haulers", value: stats.activeHaulers, mono: stats.activeHaulers.toString() },
                     {
-                      label: "Total Revenue",
+                      label: "Revenue",
                       value: stats.totalRevenueCents,
                       mono: `$${(stats.totalRevenueCents / 100).toLocaleString()}`,
                     },

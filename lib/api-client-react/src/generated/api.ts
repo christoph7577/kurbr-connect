@@ -29,6 +29,7 @@ import type {
   JobUpdate,
   ListHaulersParams,
   ListJobsParams,
+  PhotoUploadResponse,
   PublicJobStatus,
   UserProfile,
 } from "./api.schemas";
@@ -617,6 +618,87 @@ export function useGetJobStats<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Upload photos for a job (multipart/form-data, field name "photos", ≤5 files, ≤5MB each, jpg/png/webp)
+ */
+export const getUploadJobPhotosUrl = () => {
+  return `/api/jobs/photos`;
+};
+
+export const uploadJobPhotos = async (
+  options?: RequestInit,
+): Promise<PhotoUploadResponse> => {
+  return customFetch<PhotoUploadResponse>(getUploadJobPhotosUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getUploadJobPhotosMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadJobPhotos>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadJobPhotos>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["uploadJobPhotos"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadJobPhotos>>,
+    void
+  > = () => {
+    return uploadJobPhotos(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadJobPhotosMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadJobPhotos>>
+>;
+
+export type UploadJobPhotosMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Upload photos for a job (multipart/form-data, field name "photos", ≤5 files, ≤5MB each, jpg/png/webp)
+ */
+export const useUploadJobPhotos = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadJobPhotos>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadJobPhotos>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getUploadJobPhotosMutationOptions(options));
+};
 
 /**
  * @summary Get AI-powered price estimate for a job

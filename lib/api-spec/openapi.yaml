@@ -150,6 +150,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/JobStats"
 
+  /jobs/photos:
+    post:
+      operationId: uploadJobPhotos
+      tags: [jobs]
+      summary: Upload photos for a job (multipart/form-data, field name "photos", ≤5 files, ≤5MB each, jpg/png/webp)
+      responses:
+        "200":
+          description: Serving URLs for uploaded photos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+
   /jobs/estimate:
     post:
       operationId: estimateJobPrice
@@ -350,14 +363,16 @@ components:
 
     JobStats:
       type: object
-      required: [total, active, unassigned, completed, todayRevenueCents, activeHaulers, dailyRevenue]
+      required: [total, active, unassigned, completed, todayRevenueCents, totalRevenueCents, activeHaulers, jobsToday, dailyRevenue]
       properties:
         total: { type: integer }
         active: { type: integer }
         unassigned: { type: integer }
         completed: { type: integer }
         todayRevenueCents: { type: integer }
+        totalRevenueCents: { type: integer }
         activeHaulers: { type: integer }
+        jobsToday: { type: integer }
         dailyRevenue:
           type: array
           items:
