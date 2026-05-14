@@ -2,7 +2,7 @@ import { useAuth } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -18,11 +19,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import {
   useGetMyHaulerProfile,
+  getGetMyHaulerProfileQueryKey,
   useListJobs,
+  getListJobsQueryKey,
   useUpdateJob,
   setAuthTokenGetter,
+  type Hauler,
+  type Job,
 } from "@workspace/api-client-react";
-import { useEffect } from "react";
 
 const STATUS_FLOW = ["confirmed", "dispatched", "en_route", "arrived", "completed"];
 const STATUS_LABELS: Record<string, string> = {
@@ -40,33 +44,42 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "#6b7280",
 };
 
+type Tab = "jobs" | "earnings";
+
 export default function HaulerDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getToken, isSignedIn } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>("jobs");
 
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
-  const { data: haulerProfile, isLoading: profileLoading } = useGetMyHaulerProfile({
-    query: { enabled: !!isSignedIn } as any,
-  });
+  const { data: haulerProfile, isLoading: profileLoading } =
+    useGetMyHaulerProfile({
+      query: {
+        queryKey: getGetMyHaulerProfileQueryKey(),
+        enabled: !!isSignedIn,
+      },
+    });
 
-  // @ts-ignore
   const haulerId = haulerProfile?.id;
+  const listParams = haulerId ? { haulerId } : undefined;
 
   const {
     data: jobs,
     isLoading: jobsLoading,
     refetch,
     isRefetching,
-  } = useListJobs(
-    // @ts-ignore
-    { haulerId },
-    { query: { enabled: !!haulerId, refetchInterval: 10000 } as any }
-  );
+  } = useListJobs(listParams, {
+    query: {
+      queryKey: getListJobsQueryKey(listParams),
+      enabled: !!haulerId,
+      refetchInterval: 10000,
+    },
+  });
 
   const { mutateAsync: updateJob, isPending: updating } = useUpdateJob();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -87,7 +100,6 @@ export default function HaulerDashboardScreen() {
           text: "Confirm",
           onPress: async () => {
             try {
-              // @ts-ignore
               await updateJob({ id: jobId, data: { status: nextStatus } });
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               refetch();
@@ -99,6 +111,27 @@ export default function HaulerDashboardScreen() {
       ]
     );
   };
+
+  const jobList: Job[] = jobs ?? [];
+  const completedJobs = jobList.filter((j) => j.status === "completed");
+  const activeJobs = jobList.filter((j) => j.status !== "completed");
+
+  const totalEarningsCents = completedJobs.reduce(
+    (sum, j) => sum + (j.priceCents ?? 0),
+    0
+  );
+
+  const now = new Date();
+  const thisMonthJobs = completedJobs.filter((j) => {
+    const dateStr = j.updatedAt ?? j.scheduledDate;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisMonthEarningsCents = thisMonthJobs.reduce(
+    (sum, j) => sum + (j.priceCents ?? 0),
+    0
+  );
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -128,6 +161,30 @@ export default function HaulerDashboardScreen() {
       color: colors.foreground,
       flex: 1,
     },
+    tabBar: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    tabBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 6,
+    },
+    tabBtnActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.primary,
+    },
+    tabText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+    },
+    tabTextActive: { color: colors.primary },
     list: { padding: 16, paddingBottom: bottomPad + 20 },
     jobCard: {
       backgroundColor: colors.card,
@@ -163,26 +220,15 @@ export default function HaulerDashboardScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
     },
-    statusBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    statusText: {
-      fontSize: 11,
-      fontFamily: "Inter_700Bold",
-      letterSpacing: 0.5,
-    },
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 4 },
+    statusText: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
     jobDetail: {
       borderTopWidth: 1,
       borderTopColor: colors.border,
       padding: 16,
       gap: 10,
     },
-    detailRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-    },
+    detailRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     detailText: {
       fontSize: 14,
       fontFamily: "Inter_400Regular",
@@ -212,10 +258,135 @@ export default function HaulerDashboardScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.mutedForeground,
     },
-    empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 40 },
-    emptyText: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: colors.foreground },
-    emptySub: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" },
+    empty: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+      padding: 40,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+    },
+    emptySub: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+    },
     loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+    earningsScroll: { padding: 16, paddingBottom: bottomPad + 40 },
+    statRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+    statCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+    },
+    statLabel: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    statValue: {
+      fontSize: 26,
+      fontFamily: "Inter_700Bold",
+      color: colors.foreground,
+      letterSpacing: -1,
+    },
+    statValueAccent: { color: colors.primary },
+    statSub: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
+      marginTop: 24,
+      marginBottom: 12,
+    },
+    earningsJobCard: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      marginBottom: 6,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    earningsJobContent: { flex: 1 },
+    earningsJobNum: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      letterSpacing: 1,
+      marginBottom: 2,
+    },
+    earningsJobAddress: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+      marginBottom: 2,
+    },
+    earningsJobDate: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
+    earningsJobPrice: {
+      fontSize: 18,
+      fontFamily: "Inter_700Bold",
+      color: colors.primary,
+    },
+    earningsEmptyCard: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 32,
+      alignItems: "center",
+      gap: 12,
+    },
+    earningsEmptyText: {
+      fontSize: 16,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+    },
+    earningsEmptySub: {
+      fontSize: 13,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+    },
+    divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+    totalCard: {
+      backgroundColor: colors.primary + "15",
+      borderWidth: 1,
+      borderColor: colors.primary + "40",
+      padding: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    totalLabel: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground },
+    totalValue: {
+      fontSize: 28,
+      fontFamily: "Inter_700Bold",
+      color: colors.primary,
+      letterSpacing: -1,
+    },
   });
 
   if (profileLoading || (jobsLoading && !jobs)) {
@@ -226,7 +397,92 @@ export default function HaulerDashboardScreen() {
     );
   }
 
-  const jobList = (jobs as any[]) || [];
+  const renderJobCard = ({ item }: { item: Job }) => {
+    const isExpanded = selectedJobId === item.id;
+    const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
+    const canAdvance = STATUS_FLOW.indexOf(item.status) < STATUS_FLOW.length - 1;
+    const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(item.status) + 1];
+
+    return (
+      <Pressable
+        style={[styles.jobCard, isExpanded && styles.jobCardExpanded]}
+        onPress={() => setSelectedJobId(isExpanded ? null : item.id)}
+      >
+        <View style={styles.jobCardTop}>
+          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          <View style={styles.jobCardContent}>
+            <Text style={styles.jobNum}>{item.jobNumber}</Text>
+            <Text style={styles.jobAddress} numberOfLines={2}>{item.address}</Text>
+            {item.customerName && (
+              <Text style={styles.jobCustomer}>{item.customerName}</Text>
+            )}
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {STATUS_LABELS[item.status] ?? item.status}
+            </Text>
+          </View>
+        </View>
+
+        {isExpanded && (
+          <View style={styles.jobDetail}>
+            {item.scheduledDate && (
+              <View style={styles.detailRow}>
+                <Feather name="calendar" size={15} color={colors.mutedForeground} />
+                <Text style={styles.detailText}>
+                  {item.scheduledDate}
+                  {item.scheduledTime ? ` at ${item.scheduledTime}` : ""}
+                </Text>
+              </View>
+            )}
+            {item.customerPhone && (
+              <View style={styles.detailRow}>
+                <Feather name="phone" size={15} color={colors.mutedForeground} />
+                <Text style={styles.detailText}>{item.customerPhone}</Text>
+              </View>
+            )}
+            {item.priceCents != null && (
+              <View style={styles.detailRow}>
+                <Feather name="dollar-sign" size={15} color={colors.mutedForeground} />
+                <Text style={styles.detailText}>
+                  ${(item.priceCents / 100).toFixed(0)}
+                </Text>
+              </View>
+            )}
+            {item.description && (
+              <View style={styles.detailRow}>
+                <Feather name="file-text" size={15} color={colors.mutedForeground} />
+                <Text style={styles.detailText}>{item.description}</Text>
+              </View>
+            )}
+            {canAdvance && nextStatus ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.nextBtn,
+                  pressed && { opacity: 0.85 },
+                  updating && { opacity: 0.5 },
+                ]}
+                onPress={() => handleUpdateStatus(item.id, item.status)}
+                disabled={updating}
+              >
+                {updating ? (
+                  <ActivityIndicator color={colors.primaryForeground} size="small" />
+                ) : (
+                  <Text style={styles.nextBtnText}>
+                    MARK AS {STATUS_LABELS[nextStatus]?.toUpperCase()}
+                  </Text>
+                )}
+              </Pressable>
+            ) : (
+              <View style={styles.completedBadge}>
+                <Text style={styles.completedText}>Job complete</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -234,105 +490,154 @@ export default function HaulerDashboardScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={18} color={colors.foreground} />
         </Pressable>
-        <Text style={styles.headerTitle}>My Jobs</Text>
+        <Text style={styles.headerTitle}>
+          {activeTab === "jobs" ? "My Jobs" : "Earnings"}
+        </Text>
         <Feather name="truck" size={22} color={colors.primary} />
       </View>
 
-      <FlatList
-        data={jobList}
-        keyExtractor={(item: any) => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.primary}
+      <View style={styles.tabBar}>
+        <Pressable
+          style={[styles.tabBtn, activeTab === "jobs" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("jobs")}
+        >
+          <Feather
+            name="briefcase"
+            size={16}
+            color={activeTab === "jobs" ? colors.primary : colors.mutedForeground}
           />
-        }
-        ListEmptyComponent={() => (
-          <View style={styles.empty}>
-            <Feather name="inbox" size={40} color={colors.mutedForeground} />
-            <Text style={styles.emptyText}>No jobs assigned</Text>
-            <Text style={styles.emptySub}>Jobs assigned to you will appear here</Text>
-          </View>
-        )}
-        renderItem={({ item }) => {
-          const isExpanded = selectedJobId === item.id;
-          const statusColor = STATUS_COLORS[item.status] || colors.mutedForeground;
-          const canAdvance = STATUS_FLOW.indexOf(item.status) < STATUS_FLOW.length - 1;
+          <Text style={[styles.tabText, activeTab === "jobs" && styles.tabTextActive]}>
+            Jobs{activeJobs.length > 0 ? ` (${activeJobs.length})` : ""}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabBtn, activeTab === "earnings" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("earnings")}
+        >
+          <Feather
+            name="dollar-sign"
+            size={16}
+            color={activeTab === "earnings" ? colors.primary : colors.mutedForeground}
+          />
+          <Text style={[styles.tabText, activeTab === "earnings" && styles.tabTextActive]}>
+            Earnings
+          </Text>
+        </Pressable>
+      </View>
 
-          return (
-            <Pressable
-              style={[styles.jobCard, isExpanded && styles.jobCardExpanded]}
-              onPress={() => setSelectedJobId(isExpanded ? null : item.id)}
-            >
-              <View style={styles.jobCardTop}>
-                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                <View style={styles.jobCardContent}>
-                  <Text style={styles.jobNum}>{item.jobNumber}</Text>
-                  <Text style={styles.jobAddress} numberOfLines={2}>{item.address}</Text>
-                  {item.customerName && <Text style={styles.jobCustomer}>{item.customerName}</Text>}
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
-                  <Text style={[styles.statusText, { color: statusColor }]}>
-                    {STATUS_LABELS[item.status] || item.status}
+      {activeTab === "jobs" ? (
+        <FlatList
+          data={jobList}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+            />
+          }
+          ListEmptyComponent={() => (
+            <View style={styles.empty}>
+              <Feather name="inbox" size={40} color={colors.mutedForeground} />
+              <Text style={styles.emptyText}>No jobs assigned</Text>
+              <Text style={styles.emptySub}>Jobs assigned to you will appear here</Text>
+            </View>
+          )}
+          renderItem={renderJobCard}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.earningsScroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          <View style={styles.statRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Total earned</Text>
+              <Text style={[styles.statValue, styles.statValueAccent]}>
+                ${(totalEarningsCents / 100).toFixed(0)}
+              </Text>
+              <Text style={styles.statSub}>
+                {completedJobs.length} job{completedJobs.length !== 1 ? "s" : ""} completed
+              </Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>This month</Text>
+              <Text style={styles.statValue}>
+                ${(thisMonthEarningsCents / 100).toFixed(0)}
+              </Text>
+              <Text style={styles.statSub}>
+                {thisMonthJobs.length} job{thisMonthJobs.length !== 1 ? "s" : ""}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Active jobs</Text>
+              <Text style={styles.statValue}>{activeJobs.length}</Text>
+              <Text style={styles.statSub}>in progress</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Avg. per job</Text>
+              <Text style={styles.statValue}>
+                $
+                {completedJobs.length > 0
+                  ? (totalEarningsCents / completedJobs.length / 100).toFixed(0)
+                  : "0"}
+              </Text>
+              <Text style={styles.statSub}>all time</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Completed jobs</Text>
+
+          {completedJobs.length === 0 ? (
+            <View style={styles.earningsEmptyCard}>
+              <Feather name="dollar-sign" size={32} color={colors.mutedForeground} />
+              <Text style={styles.earningsEmptyText}>No completed jobs yet</Text>
+              <Text style={styles.earningsEmptySub}>
+                Complete jobs to see your earnings here
+              </Text>
+            </View>
+          ) : (
+            <>
+              {completedJobs.map((job) => (
+                <View key={job.id} style={styles.earningsJobCard}>
+                  <View style={styles.earningsJobContent}>
+                    <Text style={styles.earningsJobNum}>{job.jobNumber}</Text>
+                    <Text style={styles.earningsJobAddress} numberOfLines={1}>
+                      {job.address}
+                    </Text>
+                    {job.scheduledDate && (
+                      <Text style={styles.earningsJobDate}>
+                        {job.scheduledDate}
+                        {job.scheduledTime ? ` · ${job.scheduledTime}` : ""}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.earningsJobPrice}>
+                    ${((job.priceCents ?? 0) / 100).toFixed(0)}
                   </Text>
                 </View>
+              ))}
+              <View style={styles.divider} />
+              <View style={styles.totalCard}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>
+                  ${(totalEarningsCents / 100).toFixed(0)}
+                </Text>
               </View>
-
-              {isExpanded && (
-                <View style={styles.jobDetail}>
-                  {item.scheduledDate && (
-                    <View style={styles.detailRow}>
-                      <Feather name="calendar" size={15} color={colors.mutedForeground} />
-                      <Text style={styles.detailText}>
-                        {item.scheduledDate} {item.scheduledTime ? `at ${item.scheduledTime}` : ""}
-                      </Text>
-                    </View>
-                  )}
-                  {item.customerPhone && (
-                    <View style={styles.detailRow}>
-                      <Feather name="phone" size={15} color={colors.mutedForeground} />
-                      <Text style={styles.detailText}>{item.customerPhone}</Text>
-                    </View>
-                  )}
-                  {item.priceCents && (
-                    <View style={styles.detailRow}>
-                      <Feather name="dollar-sign" size={15} color={colors.mutedForeground} />
-                      <Text style={styles.detailText}>${(item.priceCents / 100).toFixed(0)}</Text>
-                    </View>
-                  )}
-                  {item.description && (
-                    <View style={styles.detailRow}>
-                      <Feather name="file-text" size={15} color={colors.mutedForeground} />
-                      <Text style={styles.detailText}>{item.description}</Text>
-                    </View>
-                  )}
-                  {canAdvance ? (
-                    <Pressable
-                      style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.85 }, updating && { opacity: 0.5 }]}
-                      onPress={() => handleUpdateStatus(item.id, item.status)}
-                      disabled={updating}
-                    >
-                      {updating ? (
-                        <ActivityIndicator color={colors.primaryForeground} size="small" />
-                      ) : (
-                        <Text style={styles.nextBtnText}>
-                          MARK AS {STATUS_LABELS[STATUS_FLOW[STATUS_FLOW.indexOf(item.status) + 1]]?.toUpperCase()}
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : (
-                    <View style={styles.completedBadge}>
-                      <Text style={styles.completedText}>Job complete</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </Pressable>
-          );
-        }}
-      />
+            </>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
