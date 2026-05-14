@@ -80,7 +80,6 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.4",
     "vitest": "^4.1.6"
   }
 }
