@@ -370,24 +370,40 @@ router.post("/jobs/:id/notes", requireAuth, async (req: Request, res: Response):
   try {
     const [job] = await db.select({ id: jobsTable.id, haulerId: jobsTable.haulerId }).from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
     if (!job) { res.status(404).json({ error: "Not found" }); return; }
+
     const admin = await isAdminUser(userId);
-    if (!admin) {
-      const haulerProfileId = await getHaulerProfileId(userId);
-      if (!haulerProfileId || job.haulerId !== haulerProfileId) {
+    let resolvedHaulerName: string | null = null;
+
+    if (admin) {
+      resolvedHaulerName = "Admin";
+    } else {
+      const [haulerProfile] = await db
+        .select({ id: haulerProfilesTable.id, businessName: haulerProfilesTable.businessName })
+        .from(haulerProfilesTable)
+        .where(eq(haulerProfilesTable.userId, userId))
+        .limit(1);
+      if (!haulerProfile || job.haulerId !== haulerProfile.id) {
         res.status(403).json({ error: "Forbidden" }); return;
       }
+      resolvedHaulerName = haulerProfile.businessName ?? null;
     }
-    const { contactType, note, haulerName } = req.body as Record<string, unknown>;
-    if (typeof contactType !== "string" || !contactType) {
-      res.status(400).json({ error: "contactType is required" }); return;
+
+    const { contactType, note } = req.body as Record<string, unknown>;
+    const ALLOWED_CONTACT_TYPES = ["call", "text"] as const;
+    if (typeof contactType !== "string" || !(ALLOWED_CONTACT_TYPES as readonly string[]).includes(contactType)) {
+      res.status(400).json({ error: "contactType must be 'call' or 'text'" }); return;
     }
+    if (typeof note === "string" && note.length > 400) {
+      res.status(400).json({ error: "note must be 400 characters or fewer" }); return;
+    }
+
     const [created] = await db
       .insert(contactNotesTable)
       .values({
         jobId,
         contactType,
         note: typeof note === "string" && note.trim() ? note.trim() : null,
-        haulerName: typeof haulerName === "string" && haulerName.trim() ? haulerName.trim() : null,
+        haulerName: resolvedHaulerName,
       })
       .returning();
     res.status(201).json(created);
