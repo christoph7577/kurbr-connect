@@ -65,12 +65,13 @@ router.get("/haulers", requireAdmin, async (req: Request, res: Response): Promis
   }
 });
 
-// POST /api/haulers — public (onboarding application, pre-auth)
-router.post("/haulers", async (req: Request, res: Response): Promise<void> => {
+// POST /api/haulers — authenticated (onboarding application; userId derived from session)
+router.post("/haulers", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req as AuthedRequest;
   try {
-    const { userId, businessName, licenseNumber, vehicleType, vehiclePlate, serviceAreas, backgroundCheckConsent, trainingCompleted, documents } = req.body as Record<string, unknown>;
-    if (typeof userId !== "string" || !userId || typeof vehicleType !== "string" || !vehicleType || typeof vehiclePlate !== "string" || !vehiclePlate) {
-      res.status(400).json({ error: "userId, vehicleType, and vehiclePlate are required" });
+    const { businessName, licenseNumber, vehicleType, vehiclePlate, serviceAreas, backgroundCheckConsent, trainingCompleted, documents } = req.body as Record<string, unknown>;
+    if (typeof vehicleType !== "string" || !vehicleType || typeof vehiclePlate !== "string" || !vehiclePlate) {
+      res.status(400).json({ error: "vehicleType and vehiclePlate are required" });
       return;
     }
     const [hauler] = await db.insert(haulerProfilesTable).values({

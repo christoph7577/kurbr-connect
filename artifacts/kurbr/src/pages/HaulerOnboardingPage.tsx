@@ -12,10 +12,11 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { apiPost } from "@/lib/apiClient";
 import { toast } from "sonner";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -35,6 +36,7 @@ const trainingModules = [
 ];
 
 const HaulerOnboardingPage = () => {
+  const { isSignedIn, loading, userId } = useAuth();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -90,14 +92,10 @@ const HaulerOnboardingPage = () => {
   };
 
   const handleSubmit = async () => {
+    if (!userId) return;
     setSubmitting(true);
     try {
-      // Create a placeholder userId from email (onboarding is pre-auth)
-      // The admin will create the actual Clerk account and link the profile
-      const tempUserId = `pending_${email.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}`;
-
       await apiPost("/haulers", {
-        userId: tempUserId,
         businessName: businessName || null,
         licenseNumber: licenseNumber || null,
         vehicleType,
@@ -120,6 +118,9 @@ const HaulerOnboardingPage = () => {
       setSubmitting(false);
     }
   };
+
+  if (loading) return null;
+  if (!isSignedIn) return <Navigate to="/signup" replace />;
 
   if (submitted) {
     return (

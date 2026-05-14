@@ -19,17 +19,21 @@ const ResetPasswordPage = () => {
     setLoading(true);
     try {
       const result = await clerk.client.signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code" as any,
+        strategy: "reset_password_email_code",
         code,
         password,
-      } as any);
+      });
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
         toast({ title: "Password updated!" });
         navigate("/");
+      } else {
+        toast({ title: "Could not reset password", description: "Please try again.", variant: "destructive" });
       }
-    } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || "Failed to reset password";
+    } catch (err: unknown) {
+      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
+        ?? (err as { message?: string })?.message
+        ?? "Failed to reset password";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -46,11 +50,27 @@ const ResetPasswordPage = () => {
         <form onSubmit={handleUpdate} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="code">Reset Code</Label>
-            <Input id="code" type="text" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} required className="bg-secondary border-border font-mono tracking-widest" />
+            <Input
+              id="code"
+              type="text"
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              className="bg-secondary border-border font-mono tracking-widest"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">New Password</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="bg-secondary border-border" />
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className="bg-secondary border-border"
+            />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

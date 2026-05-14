@@ -1,56 +1,107 @@
 import { useClerk } from "@clerk/react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 
 const SignupPage = () => {
   const clerk = useClerk();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const signUp = clerk.client.signUp;
-      await signUp.create({
+      await clerk.client.signUp.create({
         emailAddress: email,
         password,
         firstName: fullName.split(" ")[0],
         lastName: fullName.split(" ").slice(1).join(" ") || undefined,
       });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setSuccess(true);
-    } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || "Signup failed";
+      await clerk.client.signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setPendingVerification(true);
+    } catch (err: unknown) {
+      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
+        ?? (err as { message?: string })?.message
+        ?? "Signup failed";
       toast({ title: "Signup failed", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const result = await clerk.client.signUp.attemptEmailAddressVerification({
+        code: verificationCode,
+      });
+      if (result.status === "complete") {
+        await clerk.setActive({ session: result.createdSessionId });
+        toast({ title: "Welcome to KURBR!" });
+        navigate("/");
+      } else {
+        toast({ title: "Verification incomplete", description: "Please try again.", variant: "destructive" });
+      }
+    } catch (err: unknown) {
+      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
+        ?? (err as { message?: string })?.message
+        ?? "Verification failed";
+      toast({ title: "Verification failed", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (pendingVerification) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-sm">
-          <img src={scrappyThumbsup} alt="Scrappy" className="w-24 h-24 mx-auto" />
-          <CheckCircle className="w-12 h-12 text-primary mx-auto" />
-          <h2 className="text-xl font-bold font-mono">Check your email!</h2>
-          <p className="text-muted-foreground text-sm">
-            We've sent a confirmation link to <strong className="text-foreground">{email}</strong>.
-            Click the link to activate your account.
-          </p>
-          <Link to="/login">
-            <Button variant="outline" className="mt-4">Back to login</Button>
-          </Link>
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center space-y-2">
+            <img src={scrappyThumbsup} alt="Scrappy" className="w-16 h-16 mx-auto" />
+            <h1 className="text-2xl font-bold tracking-[-0.06em] font-mono">
+              KURBR<span className="text-primary">.</span>
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              We sent a 6-digit code to <strong className="text-foreground">{email}</strong>
+            </p>
+          </div>
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="code">Verification Code</Label>
+              <Input
+                id="code"
+                type="text"
+                placeholder="123456"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                required
+                maxLength={6}
+                className="bg-secondary border-border font-mono tracking-widest text-center text-lg"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Verify Email
+            </Button>
+          </form>
+          <button
+            onClick={() => setPendingVerification(false)}
+            className="block w-full text-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back
+          </button>
         </div>
       </div>
     );
@@ -95,11 +146,11 @@ const SignupPage = () => {
             <Input
               id="password"
               type="password"
-              placeholder="Min 6 characters"
+              placeholder="Min 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               className="bg-secondary border-border"
             />
           </div>
