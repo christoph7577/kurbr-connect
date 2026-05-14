@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
@@ -86,6 +87,24 @@ export default function HaulerDashboardScreen() {
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
+
+  const handleNavigate = (address: string) => {
+    const encoded = encodeURIComponent(address);
+    const fallback = `https://maps.google.com/?q=${encoded}`;
+    let url: string;
+    if (Platform.OS === "ios") {
+      url = `maps://?q=${encoded}`;
+    } else if (Platform.OS === "android") {
+      url = `geo:0,0?q=${encoded}`;
+    } else {
+      url = fallback;
+    }
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(fallback).catch(() => {
+        Alert.alert("Cannot open maps", "Unable to launch a maps app on this device.");
+      });
+    });
+  };
 
   const handleUpdateStatus = async (jobId: string, currentStatus: string) => {
     const idx = STATUS_FLOW.indexOf(currentStatus);
@@ -234,6 +253,22 @@ export default function HaulerDashboardScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.foreground,
       flex: 1,
+    },
+    navigateBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      paddingVertical: 12,
+      marginTop: 4,
+    },
+    navigateBtnText: {
+      fontSize: 14,
+      fontFamily: "Inter_700Bold",
+      color: colors.primary,
+      letterSpacing: 0.5,
     },
     nextBtn: {
       backgroundColor: colors.primary,
@@ -454,6 +489,18 @@ export default function HaulerDashboardScreen() {
                 <Feather name="file-text" size={15} color={colors.mutedForeground} />
                 <Text style={styles.detailText}>{item.description}</Text>
               </View>
+            )}
+            {item.address && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navigateBtn,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={() => handleNavigate(item.address!)}
+              >
+                <Feather name="navigation" size={15} color={colors.primary} />
+                <Text style={styles.navigateBtnText}>NAVIGATE</Text>
+              </Pressable>
             )}
             {canAdvance && nextStatus ? (
               <Pressable
