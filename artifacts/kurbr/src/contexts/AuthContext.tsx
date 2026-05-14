@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useUser, useClerk } from "@clerk/react";
+import { apiGet } from "@/lib/apiClient";
 
 interface AuthContextType {
   userId: string | null;
@@ -24,6 +25,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { signOut: clerkSignOut } = useClerk();
 
   const isAdmin = user?.publicMetadata?.role === "admin";
+
+  // JIT-provision profile row whenever a user is authenticated
+  useEffect(() => {
+    if (isLoaded && user) {
+      apiGet("/profile/me").catch(() => {
+        // Silent — profile provisioning is best-effort; auth still works
+      });
+    }
+  }, [isLoaded, user?.id]);
 
   const signOut = async () => {
     await clerkSignOut();
