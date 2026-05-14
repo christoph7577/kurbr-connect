@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useState, useEffect, useRef } from "react";
@@ -29,6 +30,126 @@ import {
   type Hauler,
   type Job,
 } from "@workspace/api-client-react";
+
+interface MapPreviewProps {
+  address: string;
+  lat: number | null | undefined;
+  lng: number | null | undefined;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+}
+
+function MapPreview({ address, lat, lng, onPress, colors }: MapPreviewProps) {
+  const hasCoords = lat != null && lng != null;
+  const mapUrl = hasCoords
+    ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=14&size=600x180&markers=${lat},${lng},ltblu`
+    : null;
+  const [imgError, setImgError] = useState(false);
+
+  if (!hasCoords || !mapUrl || imgError) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({
+          height: 110,
+          backgroundColor: colors.muted,
+          borderWidth: 1,
+          borderColor: colors.border,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          marginBottom: 8,
+          opacity: pressed ? 0.75 : 1,
+        })}
+      >
+        <Feather name="map-pin" size={22} color={colors.mutedForeground} />
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: "Inter_400Regular",
+            color: colors.mutedForeground,
+            textAlign: "center",
+            paddingHorizontal: 16,
+          }}
+          numberOfLines={2}
+        >
+          {address}
+        </Text>
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: "Inter_600SemiBold",
+            color: colors.primary,
+            letterSpacing: 0.5,
+          }}
+        >
+          TAP TO NAVIGATE
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        height: 130,
+        marginBottom: 8,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: colors.border,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Image
+        source={{ uri: mapUrl }}
+        style={{ width: "100%", height: "100%" }}
+        contentFit="cover"
+        transition={300}
+        cachePolicy="memory-disk"
+        onError={() => setImgError(true)}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: "rgba(0,0,0,0.45)",
+          paddingVertical: 5,
+          paddingHorizontal: 10,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+        }}
+      >
+        <Feather name="navigation" size={12} color="#fff" />
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: "Inter_600SemiBold",
+            color: "#fff",
+            letterSpacing: 0.5,
+            flex: 1,
+          }}
+          numberOfLines={1}
+        >
+          {address}
+        </Text>
+        <Text
+          style={{
+            fontSize: 10,
+            fontFamily: "Inter_600SemiBold",
+            color: "#ff6600",
+            letterSpacing: 0.5,
+          }}
+        >
+          TAP TO NAVIGATE
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
 
 const STATUS_FLOW = ["confirmed", "dispatched", "en_route", "arrived", "completed"];
 const STATUS_LABELS: Record<string, string> = {
@@ -587,16 +708,25 @@ export default function HaulerDashboardScreen() {
               </View>
             )}
             {item.address && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navigateBtn,
-                  pressed && { opacity: 0.75 },
-                ]}
-                onPress={() => handleNavigate(item.address!)}
-              >
-                <Feather name="navigation" size={15} color={colors.primary} />
-                <Text style={styles.navigateBtnText}>NAVIGATE</Text>
-              </Pressable>
+              <>
+                <MapPreview
+                  address={item.address}
+                  lat={item.addressLat}
+                  lng={item.addressLng}
+                  onPress={() => handleNavigate(item.address!)}
+                  colors={colors}
+                />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.navigateBtn,
+                    pressed && { opacity: 0.75 },
+                  ]}
+                  onPress={() => handleNavigate(item.address!)}
+                >
+                  <Feather name="navigation" size={15} color={colors.primary} />
+                  <Text style={styles.navigateBtnText}>NAVIGATE</Text>
+                </Pressable>
+              </>
             )}
             {canAdvance && nextStatus ? (
               <Pressable

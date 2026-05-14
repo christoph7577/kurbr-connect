@@ -329,6 +329,8 @@ components:
         aiEstimate:
           type: ["object", "null"]
           additionalProperties: true
+        addressLat: { type: ["number", "null"] }
+        addressLng: { type: ["number", "null"] }
         smsOptIn: { type: boolean }
         status: { type: string }
         createdAt: { type: string }

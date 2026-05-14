@@ -35,6 +35,10 @@ export interface Job {
   photos?: string[] | null;
   /** @nullable */
   aiEstimate?: JobAiEstimate;
+  /** @nullable */
+  addressLat?: number | null;
+  /** @nullable */
+  addressLng?: number | null;
   smsOptIn?: boolean;
   status: string;
   createdAt: string;

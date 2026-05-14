@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, pgEnum, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, pgEnum, jsonb, boolean, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -29,6 +29,8 @@ export const jobsTable = pgTable("jobs", {
   priceCents: integer("price_cents"),
   photos: text("photos").array(),
   aiEstimate: jsonb("ai_estimate"),
+  addressLat: doublePrecision("address_lat"),
+  addressLng: doublePrecision("address_lng"),
   smsOptIn: boolean("sms_opt_in").default(false).notNull(),
   status: jobStatusEnum("status").default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
