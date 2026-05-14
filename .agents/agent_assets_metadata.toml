@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "A-QgA20h3Y9eYX1g_ieVm"
+uri = "file://artifacts/kurbr-mobile/assets/images/icon.png"
+type = "image"
+title = "kurbr mobile app icon"

@@ -133,13 +133,31 @@ export const UpdateJobResponse = zod.object({
 });
 
 /**
- * @summary Public tracking by token
+ * @summary Track a job by tracking token (public)
  */
 export const TrackJobParams = zod.object({
   token: zod.coerce.string(),
 });
 
 export const TrackJobResponse = zod.object({
+  jobNumber: zod.string(),
+  trackingToken: zod.string(),
+  status: zod.string(),
+  serviceType: zod.string(),
+  address: zod.string(),
+  scheduledDate: zod.string().nullish(),
+  scheduledTime: zod.string().nullish(),
+  priceCents: zod.number().nullish(),
+});
+
+/**
+ * @summary Get a job by job number (public tracking)
+ */
+export const GetJobByNumberParams = zod.object({
+  jobNumber: zod.coerce.string(),
+});
+
+export const GetJobByNumberResponse = zod.object({
   jobNumber: zod.string(),
   trackingToken: zod.string(),
   status: zod.string(),

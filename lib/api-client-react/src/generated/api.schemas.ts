@@ -153,6 +153,20 @@ export interface Hauler {
   createdAt: string;
 }
 
+export interface JobTrackingInfo {
+  jobNumber: string;
+  trackingToken: string;
+  status: string;
+  serviceType: string;
+  address: string;
+  /** @nullable */
+  scheduledDate?: string | null;
+  /** @nullable */
+  scheduledTime?: string | null;
+  /** @nullable */
+  priceCents?: number | null;
+}
+
 export type HaulerInputDocumentsItem = {
   type?: string;
   uploaded?: boolean;

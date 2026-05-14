@@ -120,7 +120,7 @@ paths:
     get:
       operationId: trackJob
       tags: [jobs]
-      summary: Public tracking by token
+      summary: Track a job by tracking token (public)
       parameters:
         - in: path
           name: token
@@ -129,11 +129,32 @@ paths:
             type: string
       responses:
         "200":
-          description: Public job status
+          description: Job tracking info
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PublicJobStatus"
+                $ref: "#/components/schemas/JobTrackingInfo"
+        "404":
+          description: Not found
+
+  /jobs/by-number/{jobNumber}:
+    get:
+      operationId: getJobByNumber
+      tags: [jobs]
+      summary: Get a job by job number (public tracking)
+      parameters:
+        - in: path
+          name: jobNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job tracking info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobTrackingInfo"
         "404":
           description: Not found
 
@@ -432,6 +453,19 @@ components:
         profileName: { type: ["string", "null"] }
         profileEmail: { type: ["string", "null"] }
         createdAt: { type: string }
+
+    JobTrackingInfo:
+      type: object
+      required: [jobNumber, trackingToken, status, serviceType, address]
+      properties:
+        jobNumber: { type: string }
+        trackingToken: { type: string }
+        status: { type: string }
+        serviceType: { type: string }
+        address: { type: string }
+        scheduledDate: { type: ["string", "null"] }
+        scheduledTime: { type: ["string", "null"] }
+        priceCents: { type: ["integer", "null"] }
 
     HaulerInput:
       type: object

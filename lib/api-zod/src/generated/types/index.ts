@@ -19,6 +19,7 @@ export * from "./jobInput";
 export * from "./jobInputAiEstimate";
 export * from "./jobStats";
 export * from "./jobStatsDailyRevenueItem";
+export * from "./jobTrackingInfo";
 export * from "./jobUpdate";
 export * from "./jobUpdateAiEstimate";
 export * from "./listHaulersParams";

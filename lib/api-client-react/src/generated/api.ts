@@ -26,11 +26,11 @@ import type {
   Job,
   JobInput,
   JobStats,
+  JobTrackingInfo,
   JobUpdate,
   ListHaulersParams,
   ListJobsParams,
   PhotoUploadResponse,
-  PublicJobStatus,
   UserProfile,
 } from "./api.schemas";
 
@@ -462,7 +462,7 @@ export const useUpdateJob = <
 };
 
 /**
- * @summary Public tracking by token
+ * @summary Track a job by tracking token (public)
  */
 export const getTrackJobUrl = (token: string) => {
   return `/api/jobs/track/${token}`;
@@ -471,8 +471,8 @@ export const getTrackJobUrl = (token: string) => {
 export const trackJob = async (
   token: string,
   options?: RequestInit,
-): Promise<PublicJobStatus> => {
-  return customFetch<PublicJobStatus>(getTrackJobUrl(token), {
+): Promise<JobTrackingInfo> => {
+  return customFetch<JobTrackingInfo>(getTrackJobUrl(token), {
     ...options,
     method: "GET",
   });
@@ -520,7 +520,7 @@ export type TrackJobQueryResult = NonNullable<
 export type TrackJobQueryError = ErrorType<void>;
 
 /**
- * @summary Public tracking by token
+ * @summary Track a job by tracking token (public)
  */
 
 export function useTrackJob<
@@ -538,6 +538,94 @@ export function useTrackJob<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getTrackJobQueryOptions(token, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a job by job number (public tracking)
+ */
+export const getGetJobByNumberUrl = (jobNumber: string) => {
+  return `/api/jobs/by-number/${jobNumber}`;
+};
+
+export const getJobByNumber = async (
+  jobNumber: string,
+  options?: RequestInit,
+): Promise<JobTrackingInfo> => {
+  return customFetch<JobTrackingInfo>(getGetJobByNumberUrl(jobNumber), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJobByNumberQueryKey = (jobNumber: string) => {
+  return [`/api/jobs/by-number/${jobNumber}`] as const;
+};
+
+export const getGetJobByNumberQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJobByNumber>>,
+  TError = ErrorType<void>,
+>(
+  jobNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobByNumber>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetJobByNumberQueryKey(jobNumber);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getJobByNumber>>> = ({
+    signal,
+  }) => getJobByNumber(jobNumber, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobNumber,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJobByNumber>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJobByNumberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJobByNumber>>
+>;
+export type GetJobByNumberQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a job by job number (public tracking)
+ */
+
+export function useGetJobByNumber<
+  TData = Awaited<ReturnType<typeof getJobByNumber>>,
+  TError = ErrorType<void>,
+>(
+  jobNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobByNumber>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobByNumberQueryOptions(jobNumber, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
