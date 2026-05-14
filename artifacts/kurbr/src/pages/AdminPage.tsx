@@ -1,0 +1,151 @@
+import { useState, useEffect, useCallback } from "react";
+import { Search, Bell, Menu, Loader2 } from "lucide-react";
+import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
+import { StatsGrid } from "@/components/admin/StatsGrid";
+import { JobQueue, type Job } from "@/components/admin/JobQueue";
+import { JobDetail } from "@/components/admin/JobDetail";
+import { HaulerManagement } from "@/components/admin/HaulerManagement";
+import { apiGet } from "@/lib/apiClient";
+
+const mapJob = (j: any): Job => ({
+  id: j.jobNumber,
+  dbId: j.id,
+  customer: j.customerName || "Unknown",
+  address: j.address,
+  status: j.status,
+  hauler: j.haulerId ? "Assigned" : "Unassigned",
+  haulerId: j.haulerId,
+  eta: j.scheduledTime || "—",
+  price: j.priceCents ? `$${(j.priceCents / 100).toFixed(0)}` : "—",
+  priceCents: j.priceCents,
+  description: j.description,
+  customerEmail: j.customerEmail,
+  customerPhone: j.customerPhone,
+  scheduledDate: j.scheduledDate,
+});
+
+const AdminPage = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<AdminView>("dashboard");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      const data = await apiGet<any[]>("/jobs");
+      const mapped = data.map(mapJob);
+      setJobs(mapped);
+      if (selectedJob) {
+        const updated = mapped.find((j) => j.dbId === selectedJob.dbId);
+        if (updated) setSelectedJob(updated);
+      } else if (mapped.length > 0) {
+        setSelectedJob(mapped[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  }, [selectedJob?.dbId]);
+
+  useEffect(() => {
+    fetchJobs();
+    const interval = setInterval(fetchJobs, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelectJob = (job: Job) => {
+    setSelectedJob(job);
+    setShowDetail(true);
+  };
+
+  const filteredJobs = searchQuery
+    ? jobs.filter((j) =>
+        j.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        j.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        j.address.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : jobs;
+
+  const activeCount = jobs.filter((j) => !["completed", "cancelled"].includes(j.status)).length;
+  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status)).length;
+  const todayRevenue = jobs.reduce((sum, j) => sum + (j.priceCents || 0), 0);
+
+  const stats = {
+    activeJobs: activeCount.toString(),
+    unassigned: unassignedCount.toString(),
+    totalJobs: jobs.length.toString(),
+    todayRevenue: `$${(todayRevenue / 100).toLocaleString()}`,
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex">
+      <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeView={activeView} onChangeView={setActiveView} />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden">
+              <Menu className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <div className="relative hidden md:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                placeholder="Search jobs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-secondary pl-10 pr-4 py-2 text-sm font-mono outline-none focus:ring-1 focus:ring-primary w-64"
+              />
+            </div>
+            <span className="md:hidden text-lg font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></span>
+          </div>
+          <div className="flex items-center gap-3 md:gap-4">
+            <button className="relative">
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              {unassignedCount > 0 && <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />}
+            </button>
+            <div className="w-8 h-8 bg-secondary flex items-center justify-center text-xs font-mono font-bold">CC</div>
+          </div>
+        </header>
+
+        <div className="flex-1 p-4 md:p-6 overflow-auto">
+          {activeView === "haulers" ? (
+            <HaulerManagement />
+          ) : loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <StatsGrid stats={stats} />
+
+              <div className="md:hidden">
+                {showDetail && selectedJob ? (
+                  <div>
+                    <button onClick={() => setShowDetail(false)} className="text-xs uppercase tracking-widest text-primary font-mono mb-4 flex items-center gap-1">
+                      ← Back to queue
+                    </button>
+                    <JobDetail job={selectedJob} onUpdate={fetchJobs} />
+                  </div>
+                ) : (
+                  <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
+                )}
+              </div>
+
+              <div className="hidden md:grid grid-cols-3 gap-6">
+                <div className="col-span-2">
+                  <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
+                </div>
+                {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} />}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminPage;

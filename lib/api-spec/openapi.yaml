@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: KURBR API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: jobs
+    description: Job management
+  - name: haulers
+    description: Hauler management
+  - name: profile
+    description: User profile
 paths:
   /healthz:
     get:
@@ -24,6 +30,218 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all jobs
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: haulerId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create a new job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobInput"
+      responses:
+        "201":
+          description: Created job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a job by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateJob
+      tags: [jobs]
+      summary: Update a job
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobUpdate"
+      responses:
+        "200":
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/by-number/{jobNumber}:
+    get:
+      operationId: getJobByNumber
+      tags: [jobs]
+      summary: Get a job by job number
+      parameters:
+        - in: path
+          name: jobNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Not found
+
+  /jobs/stats:
+    get:
+      operationId: getJobStats
+      tags: [jobs]
+      summary: Get job statistics
+      responses:
+        "200":
+          description: Job stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStats"
+
+  /haulers:
+    get:
+      operationId: listHaulers
+      tags: [haulers]
+      summary: List all hauler profiles
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of haulers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Hauler"
+    post:
+      operationId: createHauler
+      tags: [haulers]
+      summary: Create a hauler profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HaulerInput"
+      responses:
+        "201":
+          description: Created hauler
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hauler"
+
+  /haulers/me:
+    get:
+      operationId: getMyHaulerProfile
+      tags: [haulers]
+      summary: Get the current user's hauler profile
+      responses:
+        "200":
+          description: Hauler profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hauler"
+        "404":
+          description: Not found
+
+  /haulers/{id}:
+    patch:
+      operationId: updateHauler
+      tags: [haulers]
+      summary: Update a hauler profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HaulerUpdate"
+      responses:
+        "200":
+          description: Updated hauler
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hauler"
+
+  /profile/me:
+    get:
+      operationId: getMyProfile
+      tags: [profile]
+      summary: Get the current user's profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +252,114 @@ components:
       required:
         - status
 
+    Job:
+      type: object
+      required: [id, jobNumber, serviceType, address, status, createdAt]
+      properties:
+        id: { type: string }
+        jobNumber: { type: string }
+        serviceType: { type: string }
+        address: { type: string }
+        scheduledDate: { type: ["string", "null"] }
+        scheduledTime: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        customerName: { type: ["string", "null"] }
+        customerEmail: { type: ["string", "null"] }
+        customerPhone: { type: ["string", "null"] }
+        customerId: { type: ["string", "null"] }
+        haulerId: { type: ["string", "null"] }
+        priceCents: { type: ["integer", "null"] }
+        status: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    JobInput:
+      type: object
+      required: [serviceType, address]
+      properties:
+        serviceType: { type: string }
+        address: { type: string }
+        scheduledDate: { type: string }
+        scheduledTime: { type: string }
+        description: { type: string }
+        customerName: { type: string }
+        customerEmail: { type: string }
+        customerPhone: { type: string }
+        priceCents: { type: integer }
+
+    JobUpdate:
+      type: object
+      properties:
+        status: { type: string }
+        haulerId: { type: ["string", "null"] }
+        scheduledDate: { type: string }
+        scheduledTime: { type: string }
+        description: { type: string }
+        priceCents: { type: integer }
+
+    JobStats:
+      type: object
+      required: [total, active, unassigned, completed, todayRevenueCents]
+      properties:
+        total: { type: integer }
+        active: { type: integer }
+        unassigned: { type: integer }
+        completed: { type: integer }
+        todayRevenueCents: { type: integer }
+
+    Hauler:
+      type: object
+      required: [id, userId, status, createdAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        businessName: { type: ["string", "null"] }
+        licenseNumber: { type: ["string", "null"] }
+        vehicleType: { type: ["string", "null"] }
+        vehiclePlate: { type: ["string", "null"] }
+        serviceAreas: { type: array, items: { type: string } }
+        backgroundCheckConsent: { type: boolean }
+        backgroundCheckDate: { type: ["string", "null"] }
+        trainingCompleted: { type: boolean }
+        trainingCompletedDate: { type: ["string", "null"] }
+        status: { type: string }
+        profileName: { type: ["string", "null"] }
+        profileEmail: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    HaulerInput:
+      type: object
+      required: [userId, vehicleType, vehiclePlate, serviceAreas]
+      properties:
+        userId: { type: string }
+        businessName: { type: string }
+        licenseNumber: { type: string }
+        vehicleType: { type: string }
+        vehiclePlate: { type: string }
+        serviceAreas: { type: array, items: { type: string } }
+        backgroundCheckConsent: { type: boolean }
+        trainingCompleted: { type: boolean }
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string }
+              uploaded: { type: boolean }
+
+    HaulerUpdate:
+      type: object
+      properties:
+        status: { type: string }
+        businessName: { type: string }
+        vehicleType: { type: string }
+        vehiclePlate: { type: string }
+
+    UserProfile:
+      type: object
+      required: [id, role]
+      properties:
+        id: { type: string }
+        fullName: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        role: { type: string }
