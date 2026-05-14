@@ -74,11 +74,12 @@ const DispatchDashboard = () => {
         apiGet<Job[]>("/jobs?status=pending"),
         apiGet<Hauler[]>("/haulers?status=approved"),
       ]);
-      // Include pending + confirmed
+      // Include pending + confirmed; filter explicitly so no other statuses can appear
       const confirmedData = await apiGet<Job[]>("/jobs?status=confirmed").catch(() => []);
-      const allPending = [...jobsData, ...confirmedData].filter(
-        (j, i, arr) => arr.findIndex((x) => x.id === j.id) === i
-      );
+      const DISPATCHABLE = new Set(["pending", "confirmed"]);
+      const allPending = [...jobsData, ...confirmedData]
+        .filter((j) => DISPATCHABLE.has(j.status))
+        .filter((j, i, arr) => arr.findIndex((x) => x.id === j.id) === i);
       setJobs(allPending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setHaulers(haulersData);
     } catch (err) {
