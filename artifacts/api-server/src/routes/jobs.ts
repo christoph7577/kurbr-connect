@@ -9,6 +9,7 @@ import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../m
 import { uploadPhoto, getPhotoBuffer, objectKeyToServingUrl, isAllowedMimeType } from "../lib/storage";
 import { objectStorageClient } from "../lib/objectStorage";
 import { sendBookingConfirmationEmail, sendStatusUpdateEmail } from "../lib/email";
+import { sendStatusSms } from "../lib/sms";
 
 const router = Router();
 
@@ -323,7 +324,7 @@ router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       serviceType, address, scheduledDate, scheduledTime, description,
-      customerName, customerEmail, customerPhone, priceCents, photos, aiEstimate,
+      customerName, customerEmail, customerPhone, priceCents, photos, aiEstimate, smsOptIn,
     } = req.body as Record<string, unknown>;
     if (typeof serviceType !== "string" || !serviceType || typeof address !== "string" || !address) {
       res.status(400).json({ error: "serviceType and address are required" });
@@ -343,6 +344,7 @@ router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
       priceCents: typeof priceCents === "number" ? priceCents : null,
       photos: Array.isArray(photos) ? (photos as string[]) : null,
       aiEstimate: aiEstimate && typeof aiEstimate === "object" ? aiEstimate as Record<string, unknown> : null,
+      smsOptIn: smsOptIn === true,
       status: "pending",
     }).returning();
     res.status(201).json(job);
@@ -436,17 +438,32 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
 
     res.json(job);
 
-    // Send status update email for dispatched / completed transitions (fire-and-forget)
+    // Send status update notifications for key transitions (fire-and-forget)
     const newStatus = updateFields["status"] as string | undefined;
     const prevStatus = existing.status;
-    if (newStatus && newStatus !== prevStatus && job.customerEmail) {
-      sendStatusUpdateEmail({
-        to: job.customerEmail,
-        customerName: job.customerName,
-        jobNumber: job.jobNumber,
-        trackingToken: job.trackingToken,
-        status: newStatus,
-      }).catch((err) => req.log.error({ err }, "Failed to send status update email"));
+    if (newStatus && newStatus !== prevStatus) {
+      if (job.customerEmail) {
+        sendStatusUpdateEmail({
+          to: job.customerEmail,
+          customerName: job.customerName,
+          jobNumber: job.jobNumber,
+          trackingToken: job.trackingToken,
+          status: newStatus,
+        }).catch((err) => req.log.error({ err }, "Failed to send status update email"));
+      }
+      // SMS: only for dispatched/en_route transitions when customer opted in
+      if (
+        job.customerPhone &&
+        job.smsOptIn &&
+        (newStatus === "dispatched" || newStatus === "en_route")
+      ) {
+        sendStatusSms({
+          to: job.customerPhone,
+          jobNumber: job.jobNumber,
+          trackingToken: job.trackingToken,
+          status: newStatus,
+        }).catch((err) => req.log.error({ err }, "Failed to send status SMS"));
+      }
     }
   } catch (err) {
     req.log.error(err);

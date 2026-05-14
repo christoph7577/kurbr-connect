@@ -19,4 +19,5 @@ export interface JobInput {
   priceCents?: number;
   photos?: string[];
   aiEstimate?: JobInputAiEstimate;
+  smsOptIn?: boolean;
 }

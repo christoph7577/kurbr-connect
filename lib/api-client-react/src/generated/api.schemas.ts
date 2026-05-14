@@ -75,6 +75,7 @@ export interface JobInput {
   priceCents?: number;
   photos?: string[];
   aiEstimate?: JobInputAiEstimate;
+  smsOptIn?: boolean;
 }
 
 export type JobUpdateAiEstimate = { [key: string]: unknown };

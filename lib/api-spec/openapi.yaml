@@ -365,6 +365,7 @@ components:
         aiEstimate:
           type: object
           additionalProperties: true
+        smsOptIn: { type: boolean }
 
     JobUpdate:
       type: object

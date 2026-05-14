@@ -85,6 +85,7 @@ const SchedulePage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const steps = ["Service", "Photos", "Location", "Schedule", "Details", "Confirm"];
@@ -175,6 +176,7 @@ const SchedulePage = () => {
         priceCents: estimatedPrice,
         photos: uploadedUrls.length > 0 ? uploadedUrls : null,
         aiEstimate: aiEstimate || null,
+        smsOptIn,
       });
       toast.success("Booking confirmed!");
       navigate(`/tracking?token=${job.trackingToken}`);
@@ -459,6 +461,21 @@ const SchedulePage = () => {
                   <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Description (optional)</label>
                   <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Old couch, broken dresser, 3 bags of yard waste..." className="w-full bg-transparent border-2 border-secondary focus:border-primary outline-none transition-colors p-4 font-mono resize-none" />
                 </div>
+                {phone.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setSmsOptIn((v) => !v)}
+                    className={`flex items-start gap-3 w-full text-left border-milled p-4 transition-colors ${smsOptIn ? "border-primary bg-primary/5" : "hover:bg-secondary/30"}`}
+                  >
+                    <div className={`mt-0.5 w-4 h-4 border-2 shrink-0 flex items-center justify-center transition-colors ${smsOptIn ? "border-primary bg-primary" : "border-secondary"}`}>
+                      {smsOptIn && <Check className="w-2.5 h-2.5 text-black" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-mono font-bold">Get SMS updates</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">We'll text you when your hauler is dispatched and en route. Standard rates apply.</p>
+                    </div>
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
