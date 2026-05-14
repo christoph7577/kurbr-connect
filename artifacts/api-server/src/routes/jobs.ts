@@ -2,9 +2,9 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
-import { jobsTable, haulerProfilesTable } from "@workspace/db";
+import { jobsTable, haulerProfilesTable, contactNotesTable } from "@workspace/db";
 import { type Job } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../middlewares/auth";
 import { uploadPhoto, getPhotoBuffer, objectKeyToServingUrl, isAllowedMimeType } from "../lib/storage";
 import { objectStorageClient } from "../lib/objectStorage";
@@ -294,25 +294,103 @@ router.get("/jobs", requireAuth, async (req: Request, res: Response): Promise<vo
   const { userId } = req as AuthedRequest;
   try {
     const admin = await isAdminUser(userId);
+    let jobs: Job[];
     if (admin) {
       const { status, haulerId } = req.query;
       const conditions = [];
       if (typeof status === "string") conditions.push(eq(jobsTable.status, status as Job["status"]));
       if (typeof haulerId === "string") conditions.push(eq(jobsTable.haulerId, haulerId));
-      const jobs = conditions.length > 0
+      const rows = conditions.length > 0
         ? await db.select().from(jobsTable).where(and(...conditions)).orderBy(jobsTable.createdAt)
         : await db.select().from(jobsTable).orderBy(jobsTable.createdAt);
-      res.json(jobs.reverse());
-      return;
+      jobs = rows.reverse();
+    } else {
+      const haulerProfileId = await getHaulerProfileId(userId);
+      if (!haulerProfileId) { res.status(403).json({ error: "Forbidden" }); return; }
+      const rows = await db
+        .select()
+        .from(jobsTable)
+        .where(eq(jobsTable.haulerId, haulerProfileId))
+        .orderBy(jobsTable.createdAt);
+      jobs = rows.reverse();
     }
-    const haulerProfileId = await getHaulerProfileId(userId);
-    if (!haulerProfileId) { res.status(403).json({ error: "Forbidden" }); return; }
-    const jobs = await db
+
+    // Attach contactNoteCount to each job
+    const jobIds = jobs.map((j) => j.id);
+    const countMap = new Map<string, number>();
+    if (jobIds.length > 0) {
+      const counts = await db
+        .select({
+          jobId: contactNotesTable.jobId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(contactNotesTable)
+        .where(inArray(contactNotesTable.jobId, jobIds))
+        .groupBy(contactNotesTable.jobId);
+      for (const row of counts) countMap.set(row.jobId, row.count);
+    }
+    const jobsWithCounts = jobs.map((j) => ({ ...j, contactNoteCount: countMap.get(j.id) ?? 0 }));
+    res.json(jobsWithCounts);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/jobs/:id/notes — admin or assigned hauler
+router.get("/jobs/:id/notes", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req as AuthedRequest;
+  const jobId = String(req.params["id"]);
+  try {
+    const [job] = await db.select({ id: jobsTable.id, haulerId: jobsTable.haulerId }).from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
+    if (!job) { res.status(404).json({ error: "Not found" }); return; }
+    const admin = await isAdminUser(userId);
+    if (!admin) {
+      const haulerProfileId = await getHaulerProfileId(userId);
+      if (!haulerProfileId || job.haulerId !== haulerProfileId) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    }
+    const notes = await db
       .select()
-      .from(jobsTable)
-      .where(eq(jobsTable.haulerId, haulerProfileId))
-      .orderBy(jobsTable.createdAt);
-    res.json(jobs.reverse());
+      .from(contactNotesTable)
+      .where(eq(contactNotesTable.jobId, jobId))
+      .orderBy(contactNotesTable.createdAt);
+    res.json(notes);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/jobs/:id/notes — assigned hauler or admin
+router.post("/jobs/:id/notes", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req as AuthedRequest;
+  const jobId = String(req.params["id"]);
+  try {
+    const [job] = await db.select({ id: jobsTable.id, haulerId: jobsTable.haulerId }).from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
+    if (!job) { res.status(404).json({ error: "Not found" }); return; }
+    const admin = await isAdminUser(userId);
+    if (!admin) {
+      const haulerProfileId = await getHaulerProfileId(userId);
+      if (!haulerProfileId || job.haulerId !== haulerProfileId) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    }
+    const { contactType, note, haulerName } = req.body as Record<string, unknown>;
+    if (typeof contactType !== "string" || !contactType) {
+      res.status(400).json({ error: "contactType is required" }); return;
+    }
+    const [created] = await db
+      .insert(contactNotesTable)
+      .values({
+        jobId,
+        contactType,
+        note: typeof note === "string" && note.trim() ? note.trim() : null,
+        haulerName: typeof haulerName === "string" && haulerName.trim() ? haulerName.trim() : null,
+      })
+      .returning();
+    res.status(201).json(created);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -7,6 +7,8 @@
  */
 
 export * from "./aiEstimate";
+export * from "./contactNote";
+export * from "./contactNoteInput";
 export * from "./estimateRequest";
 export * from "./hauler";
 export * from "./haulerInput";

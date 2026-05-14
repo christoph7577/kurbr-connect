@@ -158,6 +158,54 @@ paths:
         "404":
           description: Not found
 
+  /jobs/{id}/notes:
+    get:
+      operationId: listContactNotes
+      tags: [jobs]
+      summary: List contact notes for a job
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contact notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactNote"
+        "404":
+          description: Not found
+    post:
+      operationId: createContactNote
+      tags: [jobs]
+      summary: Log a contact note for a job
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactNoteInput"
+      responses:
+        "201":
+          description: Created contact note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactNote"
+        "404":
+          description: Not found
+
   /jobs/stats:
     get:
       operationId: getJobStats
@@ -332,6 +380,7 @@ components:
         addressLat: { type: ["number", "null"] }
         addressLng: { type: ["number", "null"] }
         smsOptIn: { type: boolean }
+        contactNoteCount: { type: ["integer", "null"] }
         status: { type: string }
         createdAt: { type: string }
         updatedAt: { type: string }
@@ -497,6 +546,25 @@ components:
         businessName: { type: string }
         vehicleType: { type: string }
         vehiclePlate: { type: string }
+
+    ContactNote:
+      type: object
+      required: [id, jobId, contactType, createdAt]
+      properties:
+        id: { type: string }
+        jobId: { type: string }
+        haulerName: { type: ["string", "null"] }
+        contactType: { type: string }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    ContactNoteInput:
+      type: object
+      required: [contactType]
+      properties:
+        contactType: { type: string }
+        note: { type: string }
+        haulerName: { type: string }
 
     UserProfile:
       type: object

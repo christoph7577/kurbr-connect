@@ -10,12 +10,15 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +29,7 @@ import {
   useListJobs,
   getListJobsQueryKey,
   useUpdateJob,
+  useCreateContactNote,
   setAuthTokenGetter,
   type Hauler,
   type Job,
@@ -176,6 +180,8 @@ export default function HaulerDashboardScreen() {
   const { getToken, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("jobs");
   const longPressActivated = useRef(false);
+  const [noteModal, setNoteModal] = useState<{ jobId: string; contactType: "call" | "text" } | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
@@ -206,6 +212,7 @@ export default function HaulerDashboardScreen() {
   });
 
   const { mutateAsync: updateJob, isPending: updating } = useUpdateJob();
+  const { mutateAsync: createContactNote } = useCreateContactNote();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -213,16 +220,41 @@ export default function HaulerDashboardScreen() {
 
   const normalizePhone = (phone: string) => phone.replace(/\s+/g, "").trim();
 
-  const handleCall = (phone: string) => {
+  const handleCall = (phone: string, jobId?: string) => {
     Linking.openURL(`tel:${normalizePhone(phone)}`).catch(() => {
       Alert.alert("Cannot place call", "Unable to open the phone dialer on this device.");
     });
+    if (jobId) {
+      setNoteText("");
+      setNoteModal({ jobId, contactType: "call" });
+    }
   };
 
-  const handleText = (phone: string) => {
+  const handleText = (phone: string, jobId?: string) => {
     Linking.openURL(`sms:${normalizePhone(phone)}`).catch(() => {
       Alert.alert("Cannot open messages", "Unable to open the SMS app on this device.");
     });
+    if (jobId) {
+      setNoteText("");
+      setNoteModal({ jobId, contactType: "text" });
+    }
+  };
+
+  const handleSaveNote = async (skipNote: boolean) => {
+    if (!noteModal) return;
+    if (!skipNote) {
+      try {
+        await createContactNote({
+          id: noteModal.jobId,
+          data: { contactType: noteModal.contactType, note: noteText.trim() || undefined },
+        });
+        refetch();
+      } catch {
+        // note saving is best-effort; don't alert the hauler
+      }
+    }
+    setNoteModal(null);
+    setNoteText("");
   };
 
   const handleLongPress = (item: Job) => {
@@ -240,15 +272,15 @@ export default function HaulerDashboardScreen() {
           cancelButtonIndex: 0,
         },
         (buttonIndex) => {
-          if (buttonIndex === 1) handleCall(item.customerPhone!);
-          if (buttonIndex === 2) handleText(item.customerPhone!);
+          if (buttonIndex === 1) handleCall(item.customerPhone!, item.id);
+          if (buttonIndex === 2) handleText(item.customerPhone!, item.id);
         }
       );
     } else {
       Alert.alert(name, item.customerPhone, [
         { text: "Cancel", style: "cancel" },
-        { text: "Call", onPress: () => handleCall(item.customerPhone!) },
-        { text: "Text", onPress: () => handleText(item.customerPhone!) },
+        { text: "Call", onPress: () => handleCall(item.customerPhone!, item.id) },
+        { text: "Text", onPress: () => handleText(item.customerPhone!, item.id) },
       ]);
     }
   };
@@ -591,6 +623,81 @@ export default function HaulerDashboardScreen() {
       color: "#fff",
       letterSpacing: 0.3,
     },
+    noteBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 4,
+    },
+    noteBadgeText: {
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    modalSheet: {
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      padding: 20,
+      paddingBottom: 36,
+      gap: 16,
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontFamily: "Inter_700Bold",
+      color: colors.foreground,
+    },
+    modalSub: {
+      fontSize: 13,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      marginTop: -8,
+    },
+    noteInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      color: colors.foreground,
+      fontFamily: "Inter_400Regular",
+      fontSize: 14,
+      padding: 12,
+      minHeight: 80,
+      textAlignVertical: "top",
+    },
+    modalBtnRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    modalSaveBtn: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 13,
+      alignItems: "center",
+    },
+    modalSaveBtnText: {
+      fontSize: 14,
+      fontFamily: "Inter_700Bold",
+      color: colors.primaryForeground,
+      letterSpacing: 0.5,
+    },
+    modalSkipBtn: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 13,
+      alignItems: "center",
+    },
+    modalSkipBtnText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      letterSpacing: 0.5,
+    },
     divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
     totalCard: {
       backgroundColor: colors.primary + "15",
@@ -646,6 +753,12 @@ export default function HaulerDashboardScreen() {
             {item.customerName && (
               <Text style={styles.jobCustomer}>{item.customerName}</Text>
             )}
+            {(item.contactNoteCount ?? 0) > 0 && (
+              <View style={styles.noteBadge}>
+                <Feather name="message-circle" size={11} color={colors.mutedForeground} />
+                <Text style={styles.noteBadgeText}>{item.contactNoteCount} contact{item.contactNoteCount === 1 ? "" : "s"}</Text>
+              </View>
+            )}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
             <Text style={[styles.statusText, { color: statusColor }]}>
@@ -675,7 +788,7 @@ export default function HaulerDashboardScreen() {
                     styles.callBtn,
                     pressed && { opacity: 0.75 },
                   ]}
-                  onPress={() => handleCall(item.customerPhone!)}
+                  onPress={() => handleCall(item.customerPhone!, item.id)}
                 >
                   <Feather name="phone-call" size={13} color="#fff" />
                   <Text style={styles.contactBtnText}>Call</Text>
@@ -686,7 +799,7 @@ export default function HaulerDashboardScreen() {
                     styles.textBtn,
                     pressed && { opacity: 0.75 },
                   ]}
-                  onPress={() => handleText(item.customerPhone!)}
+                  onPress={() => handleText(item.customerPhone!, item.id)}
                 >
                   <Feather name="message-square" size={13} color={colors.primary} />
                   <Text style={[styles.contactBtnText, { color: colors.primary }]}>Text</Text>
@@ -911,6 +1024,53 @@ export default function HaulerDashboardScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Contact note logging modal */}
+      <Modal
+        visible={!!noteModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => handleSaveNote(true)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => handleSaveNote(true)} />
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>
+              Log contact note
+            </Text>
+            <Text style={styles.modalSub}>
+              {noteModal?.contactType === "call" ? "Called" : "Texted"} the customer — add an optional note for the dispatcher.
+            </Text>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="e.g. Called to confirm arrival time…"
+              placeholderTextColor={colors.mutedForeground}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              maxLength={400}
+              autoFocus
+            />
+            <View style={styles.modalBtnRow}>
+              <Pressable
+                style={({ pressed }) => [styles.modalSkipBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => handleSaveNote(true)}
+              >
+                <Text style={styles.modalSkipBtnText}>SKIP</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.modalSaveBtn, pressed && { opacity: 0.85 }]}
+                onPress={() => handleSaveNote(false)}
+              >
+                <Text style={styles.modalSaveBtnText}>SAVE NOTE</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

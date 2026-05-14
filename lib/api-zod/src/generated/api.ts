@@ -43,6 +43,7 @@ export const ListJobsResponseItem = zod.object({
   addressLat: zod.number().nullish(),
   addressLng: zod.number().nullish(),
   smsOptIn: zod.boolean().optional(),
+  contactNoteCount: zod.number().nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
@@ -94,6 +95,7 @@ export const GetJobResponse = zod.object({
   addressLat: zod.number().nullish(),
   addressLng: zod.number().nullish(),
   smsOptIn: zod.boolean().optional(),
+  contactNoteCount: zod.number().nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
@@ -137,6 +139,7 @@ export const UpdateJobResponse = zod.object({
   addressLat: zod.number().nullish(),
   addressLng: zod.number().nullish(),
   smsOptIn: zod.boolean().optional(),
+  contactNoteCount: zod.number().nullish(),
   status: zod.string(),
   createdAt: zod.string(),
   updatedAt: zod.string().optional(),
@@ -176,6 +179,36 @@ export const GetJobByNumberResponse = zod.object({
   scheduledDate: zod.string().nullish(),
   scheduledTime: zod.string().nullish(),
   priceCents: zod.number().nullish(),
+});
+
+/**
+ * @summary List contact notes for a job
+ */
+export const ListContactNotesParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const ListContactNotesResponseItem = zod.object({
+  id: zod.string(),
+  jobId: zod.string(),
+  haulerName: zod.string().nullish(),
+  contactType: zod.string(),
+  note: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const ListContactNotesResponse = zod.array(ListContactNotesResponseItem);
+
+/**
+ * @summary Log a contact note for a job
+ */
+export const CreateContactNoteParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const CreateContactNoteBody = zod.object({
+  contactType: zod.string(),
+  note: zod.string().optional(),
+  haulerName: zod.string().optional(),
 });
 
 /**

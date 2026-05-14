@@ -1,9 +1,18 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus } from "lucide-react";
+import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus, Phone, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPatch } from "@/lib/apiClient";
 import { toast } from "sonner";
 import type { Job } from "./JobQueue";
+
+interface ContactNote {
+  id: string;
+  jobId: string;
+  haulerName: string | null;
+  contactType: string;
+  note: string | null;
+  createdAt: string;
+}
 
 type JobStatus = "pending" | "confirmed" | "dispatched" | "en_route" | "arrived" | "completed" | "cancelled";
 
@@ -36,6 +45,8 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
   const [showHaulerPicker, setShowHaulerPicker] = useState(false);
   const [haulers, setHaulers] = useState<Hauler[]>([]);
   const [loadingHaulers, setLoadingHaulers] = useState(false);
+  const [contactNotes, setContactNotes] = useState<ContactNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
 
   const fetchHaulers = async () => {
     setLoadingHaulers(true);
@@ -54,9 +65,24 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
     setLoadingHaulers(false);
   };
 
+  const fetchNotes = async () => {
+    setLoadingNotes(true);
+    try {
+      const data = await apiGet<ContactNote[]>(`/jobs/${job.dbId}/notes`);
+      setContactNotes(data);
+    } catch {
+      // notes are supplemental — don't surface fetch errors
+    }
+    setLoadingNotes(false);
+  };
+
   useEffect(() => {
     fetchHaulers();
   }, []);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [job.dbId]);
 
   const updateStatus = async (newStatus: JobStatus) => {
     setUpdating(true);
@@ -207,6 +233,44 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
             <div>
               <span className="text-xs uppercase tracking-widest text-muted-foreground block mb-1">Notes</span>
               <p className="text-sm text-muted-foreground font-mono">{job.description}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Contact log */}
+        <div className="border-t border-border pt-4 mt-2">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground block mb-3">
+            Contact Log {contactNotes.length > 0 && `(${contactNotes.length})`}
+          </span>
+          {loadingNotes ? (
+            <div className="flex justify-center py-3">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : contactNotes.length === 0 ? (
+            <p className="text-xs text-muted-foreground font-mono">No contact notes yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {contactNotes.map((n) => (
+                <div key={n.id} className="bg-secondary/30 px-3 py-2.5 space-y-1">
+                  <div className="flex items-center gap-2">
+                    {n.contactType === "call" ? (
+                      <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                    ) : (
+                      <MessageSquare className="w-3 h-3 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="text-xs font-mono uppercase tracking-wide text-foreground">
+                      {n.contactType === "call" ? "Called" : "Texted"}
+                      {n.haulerName ? ` · ${n.haulerName}` : ""}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {new Date(n.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  {n.note && (
+                    <p className="text-xs text-muted-foreground font-mono pl-5">{n.note}</p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -47,6 +47,8 @@ export interface Job {
   /** @nullable */
   addressLng?: number | null;
   smsOptIn?: boolean;
+  /** @nullable */
+  contactNoteCount?: number | null;
   status: string;
   createdAt: string;
   updatedAt?: string;
@@ -194,6 +196,23 @@ export interface HaulerUpdate {
   businessName?: string;
   vehicleType?: string;
   vehiclePlate?: string;
+}
+
+export interface ContactNote {
+  id: string;
+  jobId: string;
+  /** @nullable */
+  haulerName?: string | null;
+  contactType: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+}
+
+export interface ContactNoteInput {
+  contactType: string;
+  note?: string;
+  haulerName?: string;
 }
 
 export interface UserProfile {

@@ -40,6 +40,8 @@ export interface Job {
   /** @nullable */
   addressLng?: number | null;
   smsOptIn?: boolean;
+  /** @nullable */
+  contactNoteCount?: number | null;
   status: string;
   createdAt: string;
   updatedAt?: string;

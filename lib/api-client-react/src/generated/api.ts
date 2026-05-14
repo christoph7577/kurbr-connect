@@ -18,6 +18,8 @@ import type {
 
 import type {
   AiEstimate,
+  ContactNote,
+  ContactNoteInput,
   EstimateRequest,
   Hauler,
   HaulerInput,
@@ -633,6 +635,180 @@ export function useGetJobByNumber<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List contact notes for a job
+ */
+export const getListContactNotesUrl = (id: string) => {
+  return `/api/jobs/${id}/notes`;
+};
+
+export const listContactNotes = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ContactNote[]> => {
+  return customFetch<ContactNote[]>(getListContactNotesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListContactNotesQueryKey = (id: string) => {
+  return [`/api/jobs/${id}/notes`] as const;
+};
+
+export const getListContactNotesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listContactNotes>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listContactNotes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListContactNotesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listContactNotes>>
+  > = ({ signal }) => listContactNotes(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listContactNotes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListContactNotesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listContactNotes>>
+>;
+export type ListContactNotesQueryError = ErrorType<void>;
+
+/**
+ * @summary List contact notes for a job
+ */
+
+export function useListContactNotes<
+  TData = Awaited<ReturnType<typeof listContactNotes>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listContactNotes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListContactNotesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Log a contact note for a job
+ */
+export const getCreateContactNoteUrl = (id: string) => {
+  return `/api/jobs/${id}/notes`;
+};
+
+export const createContactNote = async (
+  id: string,
+  contactNoteInput: ContactNoteInput,
+  options?: RequestInit,
+): Promise<ContactNote> => {
+  return customFetch<ContactNote>(getCreateContactNoteUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(contactNoteInput),
+  });
+};
+
+export const getCreateContactNoteMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createContactNote>>,
+    TError,
+    { id: string; data: BodyType<ContactNoteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createContactNote>>,
+  TError,
+  { id: string; data: BodyType<ContactNoteInput> },
+  TContext
+> => {
+  const mutationKey = ["createContactNote"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createContactNote>>,
+    { id: string; data: BodyType<ContactNoteInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return createContactNote(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateContactNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createContactNote>>
+>;
+export type CreateContactNoteMutationBody = BodyType<ContactNoteInput>;
+export type CreateContactNoteMutationError = ErrorType<void>;
+
+/**
+ * @summary Log a contact note for a job
+ */
+export const useCreateContactNote = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createContactNote>>,
+    TError,
+    { id: string; data: BodyType<ContactNoteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createContactNote>>,
+  TError,
+  { id: string; data: BodyType<ContactNoteInput> },
+  TContext
+> => {
+  return useMutation(getCreateContactNoteMutationOptions(options));
+};
 
 /**
  * @summary Get job statistics
