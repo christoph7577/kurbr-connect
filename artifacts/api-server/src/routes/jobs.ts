@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { jobsTable, haulerProfilesTable } from "@workspace/db";
 import { type Job } from "@workspace/db";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../middlewares/auth";
 import { uploadPhoto, getPhotoBuffer, objectKeyToServingUrl, isAllowedMimeType } from "../lib/storage";
 import { objectStorageClient } from "../lib/objectStorage";
@@ -16,10 +16,15 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
 });
 
+// Use ANTHROPIC_API_KEY if provided; fall back to Replit AI integration env vars
 const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+  apiKey: process.env.ANTHROPIC_API_KEY ?? process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+  ...(process.env.ANTHROPIC_API_KEY
+    ? {}
+    : { baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL }),
 });
+
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 async function generateJobNumber(): Promise<string> {
   const existing = await db.select({ jobNumber: jobsTable.jobNumber }).from(jobsTable);
@@ -47,12 +52,10 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
     const unassigned = jobs.filter((j) => !j.haulerId && !["completed", "cancelled"].includes(j.status)).length;
     const completed = jobs.filter((j) => j.status === "completed").length;
 
-    // Revenue = sum of all completed jobs
     const totalRevenueCents = jobs
       .filter((j) => j.status === "completed")
       .reduce((sum, j) => sum + (j.priceCents ?? 0), 0);
 
-    // Revenue from jobs created today + jobs today count
     const todayStr = new Date().toISOString().split("T")[0];
     const todayJobs = jobs.filter((j) => j.createdAt.toISOString().startsWith(todayStr));
     const todayRevenueCents = todayJobs
@@ -60,14 +63,12 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
       .reduce((sum, j) => sum + (j.priceCents ?? 0), 0);
     const jobsToday = todayJobs.length;
 
-    // Active haulers count
     const haulers = await db
       .select({ id: haulerProfilesTable.id })
       .from(haulerProfilesTable)
       .where(eq(haulerProfilesTable.status, "approved"));
     const activeHaulers = haulers.length;
 
-    // Daily revenue for last 30 days (from completed jobs)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentCompleted = jobs.filter(
@@ -95,7 +96,7 @@ router.get("/jobs/stats", requireAdmin, async (req: Request, res: Response): Pro
   }
 });
 
-// GET /api/jobs/track/:token — public (customer tracking by high-entropy token)
+// GET /api/jobs/track/:token — public customer tracking
 router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<void> => {
   try {
     const token = String(req.params["token"]);
@@ -113,10 +114,7 @@ router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<vo
       .from(jobsTable)
       .where(eq(jobsTable.trackingToken, token))
       .limit(1);
-    if (!job) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
+    if (!job) { res.status(404).json({ error: "Not found" }); return; }
     res.json(job);
   } catch (err) {
     req.log.error(err);
@@ -124,7 +122,7 @@ router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<vo
   }
 });
 
-// POST /api/jobs/photos — public (multipart, called during booking flow)
+// POST /api/jobs/photos — public multipart upload (multer, GCS)
 router.post("/jobs/photos", upload.array("photos", 5), async (req: Request, res: Response): Promise<void> => {
   try {
     const files = req.files as Express.Multer.File[] | undefined;
@@ -132,11 +130,6 @@ router.post("/jobs/photos", upload.array("photos", 5), async (req: Request, res:
       res.status(400).json({ error: "At least one photo is required" });
       return;
     }
-    if (files.length > 5) {
-      res.status(400).json({ error: "Maximum 5 photos allowed" });
-      return;
-    }
-
     const urls: string[] = [];
     for (const file of files) {
       if (!isAllowedMimeType(file.mimetype)) {
@@ -146,7 +139,6 @@ router.post("/jobs/photos", upload.array("photos", 5), async (req: Request, res:
       const objectKey = await uploadPhoto(file.buffer, file.mimetype);
       urls.push(objectKeyToServingUrl(objectKey));
     }
-
     res.json({ urls });
   } catch (err) {
     req.log.error(err);
@@ -154,26 +146,17 @@ router.post("/jobs/photos", upload.array("photos", 5), async (req: Request, res:
   }
 });
 
-// GET /api/jobs/photos/* — serve uploaded job photos
+// GET /api/jobs/photos/:objectKey* — serve uploaded photos from GCS
 router.get("/jobs/photos/*objectKey", async (req: Request, res: Response): Promise<void> => {
   try {
     const objectKey = (req.params as Record<string, string>)["objectKey"];
-    if (!objectKey) {
-      res.status(400).json({ error: "Missing object key" });
-      return;
-    }
+    if (!objectKey) { res.status(400).json({ error: "Missing object key" }); return; }
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-    if (!bucketId) {
-      res.status(500).json({ error: "Storage not configured" });
-      return;
-    }
+    if (!bucketId) { res.status(500).json({ error: "Storage not configured" }); return; }
     const bucket = objectStorageClient.bucket(bucketId);
     const file = bucket.file(objectKey);
     const [exists] = await file.exists();
-    if (!exists) {
-      res.status(404).json({ error: "Photo not found" });
-      return;
-    }
+    if (!exists) { res.status(404).json({ error: "Photo not found" }); return; }
     const [metadata] = await file.getMetadata();
     res.setHeader("Content-Type", (metadata.contentType as string) || "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
@@ -184,7 +167,7 @@ router.get("/jobs/photos/*objectKey", async (req: Request, res: Response): Promi
   }
 });
 
-// POST /api/jobs/estimate — public (AI pricing estimate)
+// POST /api/jobs/estimate — AI pricing via Claude (server enforces $18/cu yd formula)
 router.post("/jobs/estimate", async (req: Request, res: Response): Promise<void> => {
   try {
     const { photoUrls, serviceType, description } = req.body as {
@@ -192,7 +175,6 @@ router.post("/jobs/estimate", async (req: Request, res: Response): Promise<void>
       serviceType?: string;
       description?: string;
     };
-
     if (!photoUrls || photoUrls.length === 0) {
       res.status(400).json({ error: "photoUrls is required" });
       return;
@@ -209,44 +191,27 @@ router.post("/jobs/estimate", async (req: Request, res: Response): Promise<void>
           : "image/jpeg";
         imageBlocks.push({
           type: "image",
-          source: {
-            type: "base64",
-            media_type: mt,
-            data: buffer.toString("base64"),
-          },
+          source: { type: "base64", media_type: mt, data: buffer.toString("base64") },
         });
       } catch {
         // Skip unreadable images
       }
     }
 
-    const prompt = `You are a junk removal pricing expert. Analyze these photos of items to be hauled away.
+    const prompt = `You are a junk removal pricing expert. Analyze these photos.
 
 Service type: ${serviceType || "residential"}
 ${description ? `Customer description: ${description}` : ""}
 
-Based on what you see, provide a JSON estimate with these exact fields:
-- estimated_volume: string (e.g. "1/4 truck", "1/2 truck", "full truck")
-- item_list: array of strings (list each visible item category)
-- difficulty_score: integer 1-5 (1=easy, 5=very difficult/heavy)
-- price_min: integer cents (minimum price)
-- price_max: integer cents (maximum price)
-- price_estimated: integer cents (best estimate, using $18/cubic yard as baseline, truck capacity ~450 cubic feet)
-
-Respond ONLY with valid JSON, no other text.`;
+Respond ONLY with valid JSON (no markdown) containing:
+- estimated_volume: string ("1/8 truck", "1/4 truck", "1/3 truck", "1/2 truck", "3/4 truck", or "full truck")
+- item_list: string[] (visible item categories)
+- difficulty_score: integer 1-5 (1=easy light items, 5=very heavy/difficult)`;
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: CLAUDE_MODEL,
       max_tokens: 8192,
-      messages: [
-        {
-          role: "user",
-          content: [
-            ...imageBlocks,
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content: [...imageBlocks, { type: "text", text: prompt }] }],
     });
 
     const textBlock = response.content.find((b) => b.type === "text");
@@ -255,42 +220,40 @@ Respond ONLY with valid JSON, no other text.`;
       return;
     }
 
-    let estimate: Record<string, unknown>;
+    let aiOutput: Record<string, unknown> = {
+      estimated_volume: "1/2 truck",
+      item_list: ["Mixed items"],
+      difficulty_score: 3,
+    };
     try {
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-      estimate = JSON.parse(jsonMatch ? jsonMatch[0] : textBlock.text);
+      aiOutput = JSON.parse(jsonMatch ? jsonMatch[0] : textBlock.text);
     } catch {
-      estimate = {
-        estimated_volume: "1/2 truck",
-        item_list: ["Mixed items"],
-        difficulty_score: 3,
-        price_min: 14900,
-        price_max: 24900,
-        price_estimated: 18000,
-      };
+      // Use defaults if parsing fails
     }
 
-    // Enforce $18/cubic yard server-side pricing formula
-    // Truck capacity ~450 cu ft = ~17 cu yd; rate = $18/cu yd = ~$1,800/cu yd in cents
+    // Server-side pricing: $18/cu yd formula (Replit billing: $18/cu yd; truck = ~17 cu yd)
     const RATE_CENTS_PER_CUYD = 1800; // $18.00/cu yd in cents
-    const VOLUME_MAP: Record<string, number> = {
+    const VOLUME_CUYD: Record<string, number> = {
       "1/8 truck": 2, "1/4 truck": 4.25, "1/3 truck": 6,
       "half truck": 8.5, "1/2 truck": 8.5, "3/4 truck": 12.75,
-      "full truck": 17, "1 truck": 17,
+      "full truck": 17,
     };
-    const vol = String(estimate["estimated_volume"] || "1/2 truck").toLowerCase();
-    let cuYards = 8.5; // default
-    for (const [k, v] of Object.entries(VOLUME_MAP)) {
+    const vol = String(aiOutput["estimated_volume"] || "1/2 truck").toLowerCase();
+    let cuYards = 8.5;
+    for (const [k, v] of Object.entries(VOLUME_CUYD)) {
       if (vol.includes(k)) { cuYards = v; break; }
     }
-    const difficulty = Math.min(5, Math.max(1, Number(estimate["difficulty_score"]) || 3));
-    const difficultyMultiplier = 1 + (difficulty - 1) * 0.1; // 1.0 – 1.4×
-    const baseCents = Math.round(cuYards * RATE_CENTS_PER_CUYD * difficultyMultiplier);
-    const minCents = Math.max(8900, Math.round(baseCents * 0.85));
-    const maxCents = Math.round(baseCents * 1.20);
-    estimate["price_min"] = minCents;
-    estimate["price_max"] = maxCents;
-    estimate["price_estimated"] = baseCents;
+    const difficulty = Math.min(5, Math.max(1, Number(aiOutput["difficulty_score"]) || 3));
+    const diffMultiplier = 1 + (difficulty - 1) * 0.1; // 1.0–1.4×
+    const baseCents = Math.round(cuYards * RATE_CENTS_PER_CUYD * diffMultiplier);
+
+    const estimate = {
+      ...aiOutput,
+      price_min: Math.max(8900, Math.round(baseCents * 0.85)),
+      price_max: Math.round(baseCents * 1.20),
+      price_estimated: baseCents,
+    };
 
     res.json(estimate);
   } catch (err) {
@@ -315,13 +278,8 @@ router.get("/jobs", requireAuth, async (req: Request, res: Response): Promise<vo
       res.json(jobs.reverse());
       return;
     }
-
-    // Non-admin: scope to own assigned jobs only
     const haulerProfileId = await getHaulerProfileId(userId);
-    if (!haulerProfileId) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
+    if (!haulerProfileId) { res.status(403).json({ error: "Forbidden" }); return; }
     const jobs = await db
       .select()
       .from(jobsTable)
@@ -334,7 +292,7 @@ router.get("/jobs", requireAuth, async (req: Request, res: Response): Promise<vo
   }
 });
 
-// POST /api/jobs — public (customer booking, no auth required)
+// POST /api/jobs — public customer booking
 router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -368,25 +326,18 @@ router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET /api/jobs/:id — admin sees any; hauler sees only their assigned job
+// GET /api/jobs/:id
 router.get("/jobs/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const { userId } = req as AuthedRequest;
   const jobId = String(req.params["id"]);
   try {
     const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
-    if (!job) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
+    if (!job) { res.status(404).json({ error: "Not found" }); return; }
     const admin = await isAdminUser(userId);
-    if (admin) {
-      res.json(job);
-      return;
-    }
+    if (admin) { res.json(job); return; }
     const haulerProfileId = await getHaulerProfileId(userId);
     if (!haulerProfileId || job.haulerId !== haulerProfileId) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
+      res.status(403).json({ error: "Forbidden" }); return;
     }
     res.json(job);
   } catch (err) {
@@ -395,16 +346,13 @@ router.get("/jobs/:id", requireAuth, async (req: Request, res: Response): Promis
   }
 });
 
-// PATCH /api/jobs/:id — admin can update any field; hauler can only update status on their own jobs
+// PATCH /api/jobs/:id
 router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const { userId } = req as AuthedRequest;
   const jobId = String(req.params["id"]);
   try {
     const [existing] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
-    if (!existing) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
 
     const admin = await isAdminUser(userId);
     const { status, haulerId, scheduledDate, scheduledTime, description, priceCents, photos, aiEstimate } = req.body as Record<string, unknown>;
@@ -421,15 +369,12 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
       if (photos !== undefined) updateFields["photos"] = photos as string[] | null;
       if (aiEstimate !== undefined) updateFields["aiEstimate"] = aiEstimate as Record<string, unknown> | null;
     } else {
-      // Non-admin: must own the job and can only update status
       const haulerProfileId = await getHaulerProfileId(userId);
       if (!haulerProfileId || existing.haulerId !== haulerProfileId) {
-        res.status(403).json({ error: "Forbidden" });
-        return;
+        res.status(403).json({ error: "Forbidden" }); return;
       }
       if (status === undefined || typeof status !== "string") {
-        res.status(400).json({ error: "Haulers may only update job status" });
-        return;
+        res.status(400).json({ error: "Haulers may only update job status" }); return;
       }
       updateFields["status"] = status as Job["status"];
     }

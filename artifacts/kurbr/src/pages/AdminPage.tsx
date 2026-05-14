@@ -128,7 +128,6 @@ const AdminPage = () => {
   });
 
   const chartData = (stats?.dailyRevenue ?? [])
-    .slice(-14)
     .map((d) => ({
       date: d.date.slice(5),
       revenue: d.totalCents / 100,
@@ -222,7 +221,7 @@ const AdminPage = () => {
                   exit={{ opacity: 0, height: 0 }}
                   className="border-milled p-4 mb-6"
                 >
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4 font-mono">Revenue — Last 14 Days</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4 font-mono">Revenue — Last 30 Days</p>
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                       <XAxis dataKey="date" tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} />
