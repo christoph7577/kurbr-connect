@@ -20,6 +20,7 @@ const SignupPage = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clerk.client?.signUp) return;
     setLoading(true);
     try {
       await clerk.client.signUp.create({
@@ -42,6 +43,7 @@ const SignupPage = () => {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clerk.client?.signUp) return;
     setLoading(true);
     try {
       const result = await clerk.client.signUp.attemptEmailAddressVerification({
@@ -154,7 +156,7 @@ const SignupPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signUp}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Create Account
           </Button>

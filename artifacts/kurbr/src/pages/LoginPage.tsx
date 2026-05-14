@@ -17,6 +17,7 @@ const LoginPage = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clerk.client?.signIn) return;
     setLoading(true);
     try {
       const result = await clerk.client.signIn.create({ identifier: email, password });
@@ -25,8 +26,10 @@ const LoginPage = () => {
         toast({ title: "Welcome back!" });
         navigate("/admin");
       }
-    } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || "Login failed";
+    } catch (err: unknown) {
+      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
+        ?? (err as { message?: string })?.message
+        ?? "Login failed";
       toast({ title: "Login failed", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -69,7 +72,7 @@ const LoginPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signIn}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Sign In
           </Button>

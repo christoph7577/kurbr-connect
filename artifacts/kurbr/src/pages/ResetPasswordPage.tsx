@@ -16,6 +16,7 @@ const ResetPasswordPage = () => {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clerk.client?.signIn) return;
     setLoading(true);
     try {
       const result = await clerk.client.signIn.attemptFirstFactor({
@@ -72,7 +73,7 @@ const ResetPasswordPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signIn}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Update Password
           </Button>

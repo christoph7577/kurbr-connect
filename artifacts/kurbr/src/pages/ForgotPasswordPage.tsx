@@ -15,6 +15,7 @@ const ForgotPasswordPage = () => {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clerk.client?.signIn) return;
     setLoading(true);
     try {
       await clerk.client.signIn.create({
@@ -69,7 +70,7 @@ const ForgotPasswordPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signIn}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Send Reset Code
           </Button>

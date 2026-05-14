@@ -59,7 +59,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-- Clerk v6 (`@clerk/react` 6.x) uses a signal-based API for `useSignIn`/`useSignUp` — use `useClerk()` for programmatic flows instead
+- Clerk v6 (`@clerk/react` 6.x) uses a signal-based API for `useSignIn`/`useSignUp` — use `useClerk()` for programmatic flows instead; guard all `clerk.client` access with `clerk.client?.signIn` / `clerk.client?.signUp` since `clerk.client` can be null before Clerk initializes (especially in production)
 - `react-day-picker` v9 uses different component/className keys than v8 (e.g. `Chevron` not `IconLeft`/`IconRight`, `month_caption` not `caption`, etc.)
 - DB schema uses camelCase field names in Drizzle; API returns camelCase JSON
 - Always run `pnpm --filter @workspace/db run push` after schema changes before starting API server
