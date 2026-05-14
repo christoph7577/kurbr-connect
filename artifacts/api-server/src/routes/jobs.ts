@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../middlewares/auth";
 import { uploadPhoto, getPhotoBuffer, objectKeyToServingUrl, isAllowedMimeType } from "../lib/storage";
 import { objectStorageClient } from "../lib/objectStorage";
+import { sendBookingConfirmationEmail, sendStatusUpdateEmail } from "../lib/email";
 
 const router = Router();
 
@@ -345,6 +346,21 @@ router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
       status: "pending",
     }).returning();
     res.status(201).json(job);
+
+    // Send booking confirmation email (fire-and-forget, don't block response)
+    if (job.customerEmail) {
+      sendBookingConfirmationEmail({
+        to: job.customerEmail,
+        customerName: job.customerName,
+        jobNumber: job.jobNumber,
+        trackingToken: job.trackingToken,
+        address: job.address,
+        serviceType: job.serviceType,
+        scheduledDate: job.scheduledDate,
+        scheduledTime: job.scheduledTime,
+        priceCents: job.priceCents,
+      }).catch((err) => req.log.error({ err }, "Failed to send booking confirmation email"));
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -419,6 +435,19 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
     }
 
     res.json(job);
+
+    // Send status update email for dispatched / completed transitions (fire-and-forget)
+    const newStatus = updateFields["status"] as string | undefined;
+    const prevStatus = existing.status;
+    if (newStatus && newStatus !== prevStatus && job.customerEmail) {
+      sendStatusUpdateEmail({
+        to: job.customerEmail,
+        customerName: job.customerName,
+        jobNumber: job.jobNumber,
+        trackingToken: job.trackingToken,
+        status: newStatus,
+      }).catch((err) => req.log.error({ err }, "Failed to send status update email"));
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
