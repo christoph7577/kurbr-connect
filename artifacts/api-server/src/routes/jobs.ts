@@ -39,11 +39,12 @@ async function generateJobNumber(): Promise<string> {
 
 async function getHaulerProfileId(userId: string): Promise<string | null> {
   const [hauler] = await db
-    .select({ id: haulerProfilesTable.id })
+    .select({ id: haulerProfilesTable.id, status: haulerProfilesTable.status })
     .from(haulerProfilesTable)
     .where(eq(haulerProfilesTable.userId, userId))
     .limit(1);
-  return hauler?.id ?? null;
+  if (!hauler || hauler.status !== "approved") return null;
+  return hauler.id;
 }
 
 // GET /api/jobs/stats — admin only
@@ -378,11 +379,11 @@ router.post("/jobs/:id/notes", requireAuth, async (req: Request, res: Response):
       resolvedHaulerName = "Admin";
     } else {
       const [haulerProfile] = await db
-        .select({ id: haulerProfilesTable.id, businessName: haulerProfilesTable.businessName })
+        .select({ id: haulerProfilesTable.id, businessName: haulerProfilesTable.businessName, status: haulerProfilesTable.status })
         .from(haulerProfilesTable)
         .where(eq(haulerProfilesTable.userId, userId))
         .limit(1);
-      if (!haulerProfile || job.haulerId !== haulerProfile.id) {
+      if (!haulerProfile || haulerProfile.status !== "approved" || job.haulerId !== haulerProfile.id) {
         res.status(403).json({ error: "Forbidden" }); return;
       }
       resolvedHaulerName = haulerProfile.businessName ?? null;
@@ -512,6 +513,17 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
       }
       if (status === undefined || typeof status !== "string") {
         res.status(400).json({ error: "Haulers may only update job status" }); return;
+      }
+      // Strict transition graph: haulers may only advance one step along the
+      // operational flow and may not cancel, revert, or jump past intermediate steps.
+      const HAULER_TRANSITIONS: Record<string, string> = {
+        dispatched: "en_route",
+        en_route: "arrived",
+        arrived: "completed",
+      };
+      const allowedNext = HAULER_TRANSITIONS[existing.status];
+      if (!allowedNext || status !== allowedNext) {
+        res.status(403).json({ error: `Haulers may not transition a job from '${existing.status}' to '${status}'` }); return;
       }
       updateFields["status"] = status as Job["status"];
     }

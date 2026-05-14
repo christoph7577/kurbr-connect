@@ -100,7 +100,7 @@ router.patch("/haulers/:id/location", requireAuth, async (req: Request, res: Res
   const haulerId = String(req.params["id"]);
   try {
     const [hauler] = await db
-      .select({ id: haulerProfilesTable.id, userId: haulerProfilesTable.userId })
+      .select({ id: haulerProfilesTable.id, userId: haulerProfilesTable.userId, status: haulerProfilesTable.status })
       .from(haulerProfilesTable)
       .where(eq(haulerProfilesTable.id, haulerId))
       .limit(1);
@@ -109,6 +109,10 @@ router.patch("/haulers/:id/location", requireAuth, async (req: Request, res: Res
       return;
     }
     if (hauler.userId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    if (hauler.status !== "approved") {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
