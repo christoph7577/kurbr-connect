@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, json, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, json, pgEnum, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -23,6 +23,9 @@ export const haulerProfilesTable = pgTable("hauler_profiles", {
   trainingCompletedDate: text("training_completed_date"),
   documents: json("documents").$type<{ type: string; uploaded: boolean }[]>().default([]),
   status: haulerStatusEnum("status").default("pending").notNull(),
+  currentLat: doublePrecision("current_lat"),
+  currentLng: doublePrecision("current_lng"),
+  locationUpdatedAt: timestamp("location_updated_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

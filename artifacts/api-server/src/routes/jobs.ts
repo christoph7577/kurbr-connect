@@ -110,12 +110,37 @@ router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<vo
         scheduledDate: jobsTable.scheduledDate,
         scheduledTime: jobsTable.scheduledTime,
         priceCents: jobsTable.priceCents,
+        haulerId: jobsTable.haulerId,
       })
       .from(jobsTable)
       .where(eq(jobsTable.trackingToken, token))
       .limit(1);
     if (!job) { res.status(404).json({ error: "Not found" }); return; }
-    res.json(job);
+
+    const activeStatuses = ["dispatched", "en_route", "arrived"];
+    let haulerLat: number | null = null;
+    let haulerLng: number | null = null;
+    let haulerLocationUpdatedAt: string | null = null;
+
+    if (job.haulerId && activeStatuses.includes(job.status)) {
+      const [hauler] = await db
+        .select({
+          currentLat: haulerProfilesTable.currentLat,
+          currentLng: haulerProfilesTable.currentLng,
+          locationUpdatedAt: haulerProfilesTable.locationUpdatedAt,
+        })
+        .from(haulerProfilesTable)
+        .where(eq(haulerProfilesTable.id, job.haulerId))
+        .limit(1);
+      if (hauler && hauler.currentLat != null && hauler.currentLng != null) {
+        haulerLat = hauler.currentLat;
+        haulerLng = hauler.currentLng;
+        haulerLocationUpdatedAt = hauler.locationUpdatedAt?.toISOString() ?? null;
+      }
+    }
+
+    const { haulerId: _h, ...jobPublic } = job;
+    res.json({ ...jobPublic, haulerLat, haulerLng, haulerLocationUpdatedAt });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -384,6 +409,15 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
       .set(updateFields as Parameters<ReturnType<typeof db.update>["set"]>[0])
       .where(eq(jobsTable.id, jobId))
       .returning();
+
+    // Clear hauler's stored location when job is completed
+    if (updateFields["status"] === "completed" && job.haulerId) {
+      await db
+        .update(haulerProfilesTable)
+        .set({ currentLat: null, currentLng: null, locationUpdatedAt: null })
+        .where(eq(haulerProfilesTable.id, job.haulerId));
+    }
+
     res.json(job);
   } catch (err) {
     req.log.error(err);

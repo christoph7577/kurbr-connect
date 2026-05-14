@@ -1,9 +1,30 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiGet } from "@/lib/apiClient";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Typed icon factories — avoids the `as any` _getIconUrl delete workaround
+function makeIcon(color: "blue" | "green"): L.Icon {
+  const hue = color === "blue" ? "hue-rotate-[200deg]" : "hue-rotate-[120deg]";
+  return new L.Icon({
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+    className: hue,
+  });
+}
+
+const haulerIcon = makeIcon("green");
+const addressIcon = makeIcon("blue");
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -20,6 +41,8 @@ const statusIndex = (s: string) => {
   return i >= 0 ? i : 0;
 };
 
+const ACTIVE_STATUSES = ["dispatched", "en_route", "arrived"];
+
 interface PublicJob {
   jobNumber: string;
   trackingToken: string;
@@ -29,6 +52,112 @@ interface PublicJob {
   scheduledDate: string | null;
   scheduledTime: string | null;
   priceCents: number | null;
+  haulerLat: number | null;
+  haulerLng: number | null;
+  haulerLocationUpdatedAt: string | null;
+}
+
+interface GeocodedAddress {
+  lat: number;
+  lng: number;
+}
+
+async function geocodeAddress(address: string): Promise<GeocodedAddress | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+    const resp = await fetch(url, { headers: { "Accept-Language": "en" } });
+    if (!resp.ok) return null;
+    const data = await resp.json() as { lat: string; lon: string }[];
+    if (!data || data.length === 0) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
+function MapFitBounds({ hauler, address }: { hauler: [number, number] | null; address: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    const points: [number, number][] = [];
+    if (hauler) points.push(hauler);
+    if (address) points.push(address);
+    if (points.length === 2) {
+      map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+    } else if (points.length === 1) {
+      map.setView(points[0], 14);
+    }
+  }, [hauler?.[0], hauler?.[1], address?.[0], address?.[1]]);
+  return null;
+}
+
+function HaulerMap({ job }: { job: PublicJob }) {
+  const hasHaulerLocation = job.haulerLat != null && job.haulerLng != null;
+  const [addressCoords, setAddressCoords] = useState<GeocodedAddress | null>(null);
+
+  useEffect(() => {
+    if (job.address) {
+      geocodeAddress(job.address).then(setAddressCoords);
+    }
+  }, [job.address]);
+
+  const defaultCenter: [number, number] = addressCoords
+    ? [addressCoords.lat, addressCoords.lng]
+    : hasHaulerLocation
+    ? [job.haulerLat!, job.haulerLng!]
+    : [37.7749, -122.4194];
+
+  const haulerPoint: [number, number] | null = hasHaulerLocation ? [job.haulerLat!, job.haulerLng!] : null;
+  const addressPoint: [number, number] | null = addressCoords ? [addressCoords.lat, addressCoords.lng] : null;
+
+  const lastUpdated = job.haulerLocationUpdatedAt
+    ? new Date(job.haulerLocationUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  return (
+    <div className="w-full rounded-none overflow-hidden border border-border">
+      <div className="flex items-center justify-between px-4 py-2 bg-secondary">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-primary" />
+          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Live Map</span>
+        </div>
+        {hasHaulerLocation && lastUpdated ? (
+          <span className="text-xs font-mono text-muted-foreground">Updated {lastUpdated}</span>
+        ) : (
+          <span className="text-xs font-mono text-muted-foreground">Waiting for hauler…</span>
+        )}
+      </div>
+      <div style={{ height: 280 }}>
+        <MapContainer
+          center={defaultCenter}
+          zoom={13}
+          style={{ height: "100%", width: "100%" }}
+          zoomControl={true}
+          attributionControl={false}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapFitBounds hauler={haulerPoint} address={addressPoint} />
+          {haulerPoint && (
+            <Marker position={haulerPoint} icon={haulerIcon}>
+              <Popup>Your hauler is here</Popup>
+            </Marker>
+          )}
+          {addressPoint && (
+            <Marker position={addressPoint} icon={addressIcon}>
+              <Popup>{job.address}</Popup>
+            </Marker>
+          )}
+        </MapContainer>
+      </div>
+      <div className="flex items-center justify-between px-4 py-1.5 bg-secondary border-t border-border text-[11px] font-mono text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Hauler
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> Pickup address
+        </span>
+      </div>
+    </div>
+  );
 }
 
 const TrackingPage = () => {
@@ -57,7 +186,7 @@ const TrackingPage = () => {
     if (tokenParam) fetchJob(tokenParam);
   }, [tokenParam]);
 
-  // Poll for status updates every 15s
+  // Poll for status and location updates every 15s
   useEffect(() => {
     if (!job) return;
     const interval = setInterval(() => fetchJob(job.trackingToken), 15000);
@@ -65,6 +194,7 @@ const TrackingPage = () => {
   }, [job?.trackingToken]);
 
   const currentStatus = job ? statusIndex(job.status) : 0;
+  const showMap = job && ACTIVE_STATUSES.includes(job.status);
 
   if (!job && !loading) {
     return (
@@ -165,6 +295,17 @@ const TrackingPage = () => {
               ))}
             </div>
           </div>
+
+          {showMap && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...springBolt, delay: 0.1 }}
+              className="w-full max-w-md mb-8"
+            >
+              <HaulerMap job={job!} />
+            </motion.div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}

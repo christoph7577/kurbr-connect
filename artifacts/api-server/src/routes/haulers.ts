@@ -94,6 +94,41 @@ router.post("/haulers", requireAuth, async (req: Request, res: Response): Promis
   }
 });
 
+// PATCH /api/haulers/:id/location — authenticated hauler, own profile only
+router.patch("/haulers/:id/location", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req as AuthedRequest;
+  const haulerId = String(req.params["id"]);
+  try {
+    const [hauler] = await db
+      .select({ id: haulerProfilesTable.id, userId: haulerProfilesTable.userId })
+      .from(haulerProfilesTable)
+      .where(eq(haulerProfilesTable.id, haulerId))
+      .limit(1);
+    if (!hauler) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (hauler.userId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    const { lat, lng } = req.body as Record<string, unknown>;
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      res.status(400).json({ error: "lat and lng must be numbers" });
+      return;
+    }
+    const [updated] = await db
+      .update(haulerProfilesTable)
+      .set({ currentLat: lat, currentLng: lng, locationUpdatedAt: new Date(), updatedAt: new Date() })
+      .where(eq(haulerProfilesTable.id, haulerId))
+      .returning();
+    res.json({ id: updated.id, currentLat: updated.currentLat, currentLng: updated.currentLng, locationUpdatedAt: updated.locationUpdatedAt });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // PATCH /api/haulers/:id — admin only (approvals, status changes)
 router.patch("/haulers/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const haulerId = String(req.params["id"]);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGet, apiPatch } from "@/lib/apiClient";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2, MapPin, Clock, ChevronRight, Navigation, LogOut,
-  CheckCircle, Truck, ArrowRight, Phone, User,
+  CheckCircle, Truck, ArrowRight, Phone, User, Radio,
 } from "lucide-react";
 import scrappyDriving from "@/assets/scrappy-driving.png";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
@@ -42,6 +42,8 @@ interface HaulerJob {
   price_cents: number | null;
 }
 
+const LOCATION_BROADCAST_INTERVAL = 30000;
+
 const HaulerDashboardPage = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -50,6 +52,10 @@ const HaulerDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [haulerProfileId, setHaulerProfileId] = useState<string | null>(null);
+  const [sharingLocation, setSharingLocation] = useState(false);
+  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sharingLocationRef = useRef(false);
+  useEffect(() => { sharingLocationRef.current = sharingLocation; }, [sharingLocation]);
 
   const fetchHaulerProfile = useCallback(async () => {
     try {
@@ -84,6 +90,16 @@ const HaulerDashboardPage = () => {
         const updated = active.find((j) => j.id === selectedJob.id);
         if (updated) setSelectedJob({ ...selectedJob, status: updated.status });
       }
+      // Auto-stop location sharing if no active location-eligible jobs remain
+      // (e.g. job completed externally by admin while hauler was sharing)
+      const hasLocationEligible = active.some((j) => ["dispatched", "en_route", "arrived"].includes(j.status));
+      if (!hasLocationEligible && sharingLocationRef.current) {
+        if (locationIntervalRef.current) {
+          clearInterval(locationIntervalRef.current);
+          locationIntervalRef.current = null;
+        }
+        setSharingLocation(false);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -100,6 +116,59 @@ const HaulerDashboardPage = () => {
     return () => clearInterval(interval);
   }, [haulerProfileId]);
 
+  const broadcastLocation = useCallback((profileId: string) => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await apiPatch(`/haulers/${profileId}/location`, {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        } catch (err) {
+          console.error("Location broadcast failed:", err);
+        }
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        if (err.code === GeolocationPositionError.PERMISSION_DENIED) {
+          if (locationIntervalRef.current) {
+            clearInterval(locationIntervalRef.current);
+            locationIntervalRef.current = null;
+          }
+          setSharingLocation(false);
+          toast({ title: "Location access denied", description: "Enable location permissions to share your position.", variant: "destructive" });
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  const toggleLocationSharing = useCallback(() => {
+    if (!haulerProfileId) return;
+    if (sharingLocation) {
+      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+      setSharingLocation(false);
+      toast({ title: "Location sharing off" });
+    } else {
+      if (!navigator.geolocation) {
+        toast({ title: "Geolocation not supported", variant: "destructive" });
+        return;
+      }
+      setSharingLocation(true);
+      broadcastLocation(haulerProfileId);
+      locationIntervalRef.current = setInterval(() => broadcastLocation(haulerProfileId), LOCATION_BROADCAST_INTERVAL);
+      toast({ title: "Location sharing on", description: "Your position is broadcast every 30s." });
+    }
+  }, [haulerProfileId, sharingLocation, broadcastLocation]);
+
+  useEffect(() => {
+    return () => {
+      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+    };
+  }, []);
+
   const advanceStatus = async (job: HaulerJob) => {
     const idx = STATUS_FLOW.indexOf(job.status as any);
     if (idx < 0 || idx >= STATUS_FLOW.length - 1) return;
@@ -108,6 +177,11 @@ const HaulerDashboardPage = () => {
     try {
       await apiPatch(`/jobs/${job.id}`, { status: next });
       toast({ title: `Job ${job.job_number} → ${STATUS_LABELS[next]}` });
+      if (next === "completed" && sharingLocation) {
+        if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+        locationIntervalRef.current = null;
+        setSharingLocation(false);
+      }
       fetchJobs();
     } catch (err: any) {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
@@ -151,6 +225,7 @@ const HaulerDashboardPage = () => {
   // Detail view
   if (selectedJob) {
     const next = nextLabel(selectedJob.status);
+    const isActiveStatus = ["dispatched", "en_route", "arrived"].includes(selectedJob.status);
     return (
       <div className="min-h-screen bg-background text-foreground">
         <header className="h-14 border-b border-border flex items-center px-4 gap-3">
@@ -169,6 +244,28 @@ const HaulerDashboardPage = () => {
               <span className="font-mono font-bold text-lg">${(selectedJob.price_cents / 100).toFixed(0)}</span>
             )}
           </div>
+
+          {isActiveStatus && (
+            <div className="bg-secondary p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Radio className={`w-5 h-5 ${sharingLocation ? "text-green-400 animate-pulse" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium font-mono">Share Location</p>
+                  <p className="text-xs text-muted-foreground">
+                    {sharingLocation ? "Broadcasting every 30s" : "Let customers track you live"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={toggleLocationSharing}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sharingLocation ? "bg-green-500" : "bg-secondary border border-border"}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sharingLocation ? "translate-x-6" : "translate-x-1"}`}
+                />
+              </button>
+            </div>
+          )}
 
           <div className="bg-secondary p-4 space-y-3">
             <div className="flex items-start gap-3">
@@ -246,9 +343,17 @@ const HaulerDashboardPage = () => {
         <h1 className="text-lg font-bold tracking-[-0.06em] font-mono">
           KURBR<span className="text-primary">.</span> <span className="text-sm font-normal text-muted-foreground">Hauler</span>
         </h1>
-        <button onClick={signOut} className="text-muted-foreground">
-          <LogOut className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          {sharingLocation && (
+            <div className="flex items-center gap-1.5 text-green-400 text-xs font-mono">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              Live
+            </div>
+          )}
+          <button onClick={signOut} className="text-muted-foreground">
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
