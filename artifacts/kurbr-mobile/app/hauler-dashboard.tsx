@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -54,6 +54,7 @@ export default function HaulerDashboardScreen() {
   const router = useRouter();
   const { getToken, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("jobs");
+  const longPressActivated = useRef(false);
 
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
@@ -105,6 +106,8 @@ export default function HaulerDashboardScreen() {
 
   const handleLongPress = (item: Job) => {
     if (!item.customerPhone) return;
+    if (selectedJobId === item.id) return;
+    longPressActivated.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const name = item.customerName ?? "Customer";
     if (Platform.OS === "ios") {
@@ -504,7 +507,13 @@ export default function HaulerDashboardScreen() {
     return (
       <Pressable
         style={[styles.jobCard, isExpanded && styles.jobCardExpanded]}
-        onPress={() => setSelectedJobId(isExpanded ? null : item.id)}
+        onPress={() => {
+          if (longPressActivated.current) {
+            longPressActivated.current = false;
+            return;
+          }
+          setSelectedJobId(isExpanded ? null : item.id);
+        }}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={350}
       >
