@@ -5,6 +5,7 @@ import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   FlatList,
@@ -100,6 +101,32 @@ export default function HaulerDashboardScreen() {
     Linking.openURL(`sms:${normalizePhone(phone)}`).catch(() => {
       Alert.alert("Cannot open messages", "Unable to open the SMS app on this device.");
     });
+  };
+
+  const handleLongPress = (item: Job) => {
+    if (!item.customerPhone) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const name = item.customerName ?? "Customer";
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: name,
+          message: item.customerPhone,
+          options: ["Cancel", "Call", "Text"],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) handleCall(item.customerPhone!);
+          if (buttonIndex === 2) handleText(item.customerPhone!);
+        }
+      );
+    } else {
+      Alert.alert(name, item.customerPhone, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Call", onPress: () => handleCall(item.customerPhone!) },
+        { text: "Text", onPress: () => handleText(item.customerPhone!) },
+      ]);
+    }
   };
 
   const handleNavigate = (address: string) => {
@@ -478,6 +505,8 @@ export default function HaulerDashboardScreen() {
       <Pressable
         style={[styles.jobCard, isExpanded && styles.jobCardExpanded]}
         onPress={() => setSelectedJobId(isExpanded ? null : item.id)}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={350}
       >
         <View style={styles.jobCardTop}>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
