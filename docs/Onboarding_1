@@ -1,0 +1,25 @@
+## Onboarding Process
+
+1. **Collect Info:**
+   - Name, phone, email
+   - Truck type and capacity
+   - Service area (cities/zip codes)
+   - Insurance verification
+   - W-9 for 1099 payments
+
+2. **Add to System:**
+   - Create profile in Supabase hauler_profiles table
+   - Add to hauler tracking spreadsheet
+   - Send welcome text with expectations
+
+3. **Set Expectations:**
+   - Response time: Reply within 5 minutes to job offers
+   - Professional behavior required
+   - Send before/after photos for verification
+   - Payment: 80% within 48 hours of job completion
+
+## Dispatch Process (Manual - Week 1-2)
+
+1. New job comes in via website
+2. Check admin dashboard
+3. Text nearest available hauler:
