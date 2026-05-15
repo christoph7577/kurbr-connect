@@ -1,0 +1,91 @@
+# Admin Operations Guide
+
+## Daily Tasks
+
+### Morning (8am)
+1. Check admin dashboard for new jobs
+2. Review pending jobs needing dispatch
+3. Check hauler availability
+4. Dispatch any overnight bookings
+
+### Throughout Day (Every 2 hours)
+1. Monitor for new job submissions
+2. Respond to customer inquiries
+3. Follow up on pending payments
+4. Check job statuses
+
+### Evening (6pm)
+1. Review completed jobs
+2. Process hauler payments
+3. Send customer satisfaction surveys
+4. Plan next day dispatches
+
+## Admin Dashboard
+
+**URL:** /admin (requires authentication)
+
+**Key Sections:**
+- **Stats Overview:** Jobs today, total revenue, active haulers
+- **Job Queue:** All pending jobs needing dispatch
+- **Active Jobs:** Currently in progress
+- **Completed Jobs:** Archive and reporting
+- **Hauler Management:** View/edit hauler profiles
+
+## Dispatch Decision Tree
+
+**New Job Submitted:**
+1. Review photos and estimate
+2. Check address/service area
+3. Find 3 closest available haulers
+4. Text hauler #1
+5. Wait 5 minutes for response
+6. If no response, text hauler #2
+7. If no response, text hauler #3
+8. If none respond, call haulers directly
+
+## Handling Issues
+
+### Customer Cancellation
+- If >24 hours notice: Full refund
+- If <24 hours notice: 50% cancellation fee
+- Update job status to "cancelled"
+
+### Hauler No-Show
+- Contact hauler immediately
+- Reassign to backup hauler
+- Offer customer compensation
+- Warning to hauler
+
+### Customer Complaint
+- Gather details from both sides
+- Review photos if available
+- Determine resolution (refund, redo, discount)
+- Document in system
+
+### Pricing Dispute
+- Review AI estimate vs. actual volume
+- Check if customer added items after estimate
+- Offer compromise if AI was significantly off
+- Update AI pricing parameters if needed
+
+## Weekly Tasks
+
+**Every Monday:**
+- Review previous week metrics
+- Calculate revenue/costs
+- Check hauler utilization rates
+- Plan marketing for the week
+
+**Every Friday:**
+- Process all hauler payments
+- Send weekly summary email to haulers
+- Review and respond to feedback
+- Update marketing based on results
+
+## Monthly Tasks
+
+- Financial reconciliation
+- Send 1099s to haulers (if over threshold)
+- Review and optimize pricing
+- Analyze customer acquisition costs
+- Plan next month's marketing budget
