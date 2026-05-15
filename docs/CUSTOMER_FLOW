@@ -1,0 +1,62 @@
+# Customer Booking Flow
+
+## Step-by-Step Process
+
+### 1. Land on kurbr.com
+- See hero section with value prop
+- Click "Schedule Pickup" CTA
+
+### 2. Select Service Type
+- Residential (furniture, appliances, general junk)
+- Commercial (office equipment, light demo)
+- Specialty (e-waste, donation pickups)
+
+### 3. Upload Photos
+- Drag/drop or select 2-5 photos
+- Photos stored in Supabase Storage
+- AI analyzes photos immediately
+
+### 4. Get AI Price Estimate
+- Claude Sonnet 4 analyzes photos
+- Estimates volume in cubic yards
+- Calculates price: $18/cubic yard + adjustments
+- Shows price range: $X-Y
+
+### 5. Enter Location
+- Street address
+- City, State, ZIP
+- Access notes (stairs, gate code, etc.)
+
+### 6. Choose Schedule
+- Date picker (next 7 days)
+- Time slots (8am-6pm)
+- Same-day if before noon
+
+### 7. Customer Details
+- Name
+- Email
+- Phone
+
+### 8. Review & Confirm
+- See all details
+- Review photos
+- Confirm price
+- Submit booking
+
+### 9. Payment (Current: Manual)
+- Customer receives text with Venmo/Zelle instructions
+- Pays manually
+- Job confirmed after payment
+
+### 10. Track Job
+- Redirected to tracking page
+- Status updates: Confirmed → Dispatched → En Route → Arrived → Completed
+- Receive SMS updates
+
+## Payment Flow (When Stripe Added)
+
+1. Enter card details on confirmation page
+2. Stripe validates card
+3. Charge authorized but not captured
+4. Charge captured when job marked complete
+5. Automatic receipt emailed
