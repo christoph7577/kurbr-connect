@@ -22,7 +22,6 @@ import {
   useEstimateJobPrice,
   uploadJobPhotos,
   type AiEstimate,
-  type JobInputAiEstimate,
   type Job,
 } from "@workspace/api-client-react";
 
@@ -212,11 +211,7 @@ export default function ScheduleScreen() {
           customerName: name,
           customerEmail: email || undefined,
           customerPhone: phone || undefined,
-          priceCents: finalPrice,
           photos: photoUrls.length > 0 ? photoUrls : undefined,
-          // AiEstimate is structurally compatible with JobInputAiEstimate ({ [key: string]: unknown })
-          // but lacks an explicit index signature; cast through unknown as TypeScript recommends.
-          aiEstimate: estimate ? (estimate as unknown as JobInputAiEstimate) : undefined,
         },
       });
       setTrackingToken(job.trackingToken ?? "");

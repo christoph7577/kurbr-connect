@@ -410,13 +410,9 @@ components:
         customerName: { type: string }
         customerEmail: { type: string }
         customerPhone: { type: string }
-        priceCents: { type: integer }
         photos:
           type: array
           items: { type: string }
-        aiEstimate:
-          type: object
-          additionalProperties: true
         smsOptIn: { type: boolean }
 
     JobUpdate:

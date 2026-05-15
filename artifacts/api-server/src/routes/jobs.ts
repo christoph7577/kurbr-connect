@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { jobsTable, haulerProfilesTable, contactNotesTable } from "@workspace/db";
 import { type Job } from "@workspace/db";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, max } from "drizzle-orm";
 import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../middlewares/auth";
 import { uploadPhoto, getPhotoBuffer, objectKeyToServingUrl, isAllowedMimeType } from "../lib/storage";
 import { objectStorageClient } from "../lib/objectStorage";
@@ -18,6 +19,34 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
 });
 
+// Per-IP rate limits for cost-bearing public endpoints
+const photoUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many upload requests — please try again later" },
+});
+
+const estimateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many estimate requests — please try again later" },
+});
+
+const bookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many booking requests — please try again later" },
+});
+
+// Pattern for URLs produced by our own photo upload endpoint
+const OWN_PHOTO_URL_RE = /^\/api\/jobs\/photos\/job-photos\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+
 // Use ANTHROPIC_API_KEY if provided; fall back to Replit AI integration env vars
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY ?? process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -29,12 +58,11 @@ const anthropic = new Anthropic({
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 async function generateJobNumber(): Promise<string> {
-  const existing = await db.select({ jobNumber: jobsTable.jobNumber }).from(jobsTable);
-  const nums = existing
-    .map((j) => parseInt(j.jobNumber.replace("JOB-", ""), 10))
-    .filter((n) => !isNaN(n));
-  const max = nums.length > 0 ? Math.max(...nums) : 1000;
-  return `JOB-${max + 1}`;
+  const [row] = await db
+    .select({ maxNum: max(sql<number>`cast(regexp_replace(job_number, 'JOB-', '', 'g') as integer)`) })
+    .from(jobsTable);
+  const current = Number(row?.maxNum ?? 1000);
+  return `JOB-${current + 1}`;
 }
 
 async function getHaulerProfileId(userId: string): Promise<string | null> {
@@ -151,7 +179,7 @@ router.get("/jobs/track/:token", async (req: Request, res: Response): Promise<vo
 });
 
 // POST /api/jobs/photos — public multipart upload (multer, GCS)
-router.post("/jobs/photos", upload.array("photos", 5), async (req: Request, res: Response): Promise<void> => {
+router.post("/jobs/photos", photoUploadLimiter, upload.array("photos", 5), async (req: Request, res: Response): Promise<void> => {
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {
@@ -196,20 +224,30 @@ router.get("/jobs/photos/*objectKey", async (req: Request, res: Response): Promi
 });
 
 // POST /api/jobs/estimate — AI pricing via Claude (server enforces $18/cu yd formula)
-router.post("/jobs/estimate", async (req: Request, res: Response): Promise<void> => {
+router.post("/jobs/estimate", estimateLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { photoUrls, serviceType, description } = req.body as {
       photoUrls?: string[];
       serviceType?: string;
       description?: string;
     };
-    if (!photoUrls || photoUrls.length === 0) {
+    if (!photoUrls || !Array.isArray(photoUrls) || photoUrls.length === 0) {
       res.status(400).json({ error: "photoUrls is required" });
       return;
     }
 
+    // Only accept URLs produced by our own upload endpoint — reject external or crafted URLs
+    const validUrls = photoUrls
+      .filter((u) => typeof u === "string" && OWN_PHOTO_URL_RE.test(u))
+      .slice(0, 5);
+
+    if (validUrls.length === 0) {
+      res.status(400).json({ error: "No valid photo URLs provided" });
+      return;
+    }
+
     const imageBlocks: Anthropic.ImageBlockParam[] = [];
-    for (const url of photoUrls.slice(0, 5)) {
+    for (const url of validUrls) {
       try {
         const objectKey = url.replace(/^\/api\/jobs\/photos\//, "");
         const { buffer, mimeType } = await getPhotoBuffer(objectKey);
@@ -226,6 +264,11 @@ router.post("/jobs/estimate", async (req: Request, res: Response): Promise<void>
       }
     }
 
+    if (imageBlocks.length === 0) {
+      res.status(400).json({ error: "No photos could be read" });
+      return;
+    }
+
     const prompt = `You are a junk removal pricing expert. Analyze these photos.
 
 Service type: ${serviceType || "residential"}
@@ -238,7 +281,7 @@ Respond ONLY with valid JSON (no markdown) containing:
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 8192,
+      max_tokens: 512,
       messages: [{ role: "user", content: [...imageBlocks, { type: "text", text: prompt }] }],
     });
 
@@ -415,16 +458,20 @@ router.post("/jobs/:id/notes", requireAuth, async (req: Request, res: Response):
 });
 
 // POST /api/jobs — public customer booking
-router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
+router.post("/jobs", bookingLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       serviceType, address, scheduledDate, scheduledTime, description,
-      customerName, customerEmail, customerPhone, priceCents, photos, aiEstimate, smsOptIn,
+      customerName, customerEmail, customerPhone, photos, smsOptIn,
     } = req.body as Record<string, unknown>;
     if (typeof serviceType !== "string" || !serviceType || typeof address !== "string" || !address) {
       res.status(400).json({ error: "serviceType and address are required" });
       return;
     }
+    // Only accept photos that were produced by our own upload endpoint
+    const validatedPhotos = Array.isArray(photos)
+      ? (photos as unknown[]).filter((u): u is string => typeof u === "string" && OWN_PHOTO_URL_RE.test(u))
+      : null;
     const jobNumber = await generateJobNumber();
     const [job] = await db.insert(jobsTable).values({
       jobNumber,
@@ -436,9 +483,9 @@ router.post("/jobs", async (req: Request, res: Response): Promise<void> => {
       customerName: typeof customerName === "string" ? customerName : null,
       customerEmail: typeof customerEmail === "string" ? customerEmail : null,
       customerPhone: typeof customerPhone === "string" ? customerPhone : null,
-      priceCents: typeof priceCents === "number" ? priceCents : null,
-      photos: Array.isArray(photos) ? (photos as string[]) : null,
-      aiEstimate: aiEstimate && typeof aiEstimate === "object" ? aiEstimate as Record<string, unknown> : null,
+      priceCents: null, // Price is set by admin after review — not trusted from client
+      photos: validatedPhotos && validatedPhotos.length > 0 ? validatedPhotos : null,
+      aiEstimate: null, // Not stored at booking time; admin sets final price
       smsOptIn: smsOptIn === true,
       status: "pending",
     }).returning();

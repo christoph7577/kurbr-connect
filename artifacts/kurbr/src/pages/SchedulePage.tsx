@@ -173,9 +173,7 @@ const SchedulePage = () => {
         customerName: name,
         customerEmail: email || null,
         customerPhone: phone || null,
-        priceCents: estimatedPrice,
         photos: uploadedUrls.length > 0 ? uploadedUrls : null,
-        aiEstimate: aiEstimate || null,
         smsOptIn,
       });
       toast.success("Booking confirmed!");

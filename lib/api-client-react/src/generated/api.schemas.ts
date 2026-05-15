@@ -68,8 +68,6 @@ export interface PublicJobStatus {
   priceCents?: number | null;
 }
 
-export type JobInputAiEstimate = { [key: string]: unknown };
-
 export interface JobInput {
   serviceType: string;
   address: string;
@@ -79,9 +77,7 @@ export interface JobInput {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
-  priceCents?: number;
   photos?: string[];
-  aiEstimate?: JobInputAiEstimate;
   smsOptIn?: boolean;
 }
 

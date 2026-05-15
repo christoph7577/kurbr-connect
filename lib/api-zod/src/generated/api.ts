@@ -62,9 +62,7 @@ export const CreateJobBody = zod.object({
   customerName: zod.string().optional(),
   customerEmail: zod.string().optional(),
   customerPhone: zod.string().optional(),
-  priceCents: zod.number().optional(),
   photos: zod.array(zod.string()).optional(),
-  aiEstimate: zod.record(zod.string(), zod.unknown()).optional(),
   smsOptIn: zod.boolean().optional(),
 });
 

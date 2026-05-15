@@ -18,7 +18,6 @@ export * from "./healthStatus";
 export * from "./job";
 export * from "./jobAiEstimate";
 export * from "./jobInput";
-export * from "./jobInputAiEstimate";
 export * from "./jobStats";
 export * from "./jobStatsDailyRevenueItem";
 export * from "./jobTrackingInfo";

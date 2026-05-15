@@ -5,7 +5,6 @@
  * KURBR API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { JobInputAiEstimate } from "./jobInputAiEstimate";
 
 export interface JobInput {
   serviceType: string;
@@ -16,8 +15,6 @@ export interface JobInput {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
-  priceCents?: number;
   photos?: string[];
-  aiEstimate?: JobInputAiEstimate;
   smsOptIn?: boolean;
 }

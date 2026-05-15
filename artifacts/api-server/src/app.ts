@@ -13,6 +13,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the first proxy hop so rate limiters key on the real client IP
+// (Replit and most PaaS platforms terminate TLS and forward X-Forwarded-For)
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
