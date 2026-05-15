@@ -1,4 +1,5 @@
-import { useAuth, useUser } from "@clerk/expo";
+import { useUser } from "@clerk/expo";
+import { useAuth } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -13,13 +14,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useSignOut } from "@/hooks/useSignOut";
 import { useGetMyProfile } from "@workspace/api-client-react";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn } = useAuth();
+  const signOut = useSignOut();
   const { user } = useUser();
   const { data: profile, isLoading } = useGetMyProfile({ query: { enabled: !!isSignedIn } as any });
 
@@ -266,7 +269,7 @@ export default function ProfileScreen() {
           <Text style={[styles.menuLabel, { marginTop: 20 }]}>Session</Text>
           <Pressable
             style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.8 }]}
-            onPress={() => signOut()}
+            onPress={() => { queryClient.clear(); signOut(); }}
           >
             <Feather name="log-out" size={18} color={colors.destructive} />
             <Text style={[styles.menuItemText, styles.menuItemDanger]}>Sign out</Text>

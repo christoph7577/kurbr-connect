@@ -187,6 +187,12 @@ export default function HaulerDashboardScreen() {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
+  useEffect(() => {
+    if (isSignedIn === false) {
+      router.replace("/(tabs)");
+    }
+  }, [isSignedIn]);
+
   const { data: haulerProfile, isLoading: profileLoading } =
     useGetMyHaulerProfile({
       query: {

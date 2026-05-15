@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -34,18 +34,27 @@ export default function AdminDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
+  const { user } = useUser();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+  const isAdmin = isSignedIn && (user?.publicMetadata as any)?.role === "admin";
 
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
+  useEffect(() => {
+    if (isSignedIn === false || (isSignedIn && user && !isAdmin)) {
+      router.replace("/(tabs)");
+    }
+  }, [isSignedIn, user, isAdmin]);
+
   const {
     data: stats,
     isLoading: statsLoading,
     refetch: refetchStats,
-  } = useGetJobStats({ query: { refetchInterval: 10000 } as any });
+  } = useGetJobStats({ query: { enabled: !!isAdmin, refetchInterval: 10000 } as any });
 
   const {
     data: jobs,
@@ -55,7 +64,7 @@ export default function AdminDashboardScreen() {
   } = useListJobs(
     // @ts-ignore
     statusFilter ? { status: statusFilter } : {},
-    { query: { refetchInterval: 10000 } as any }
+    { query: { enabled: !!isAdmin, refetchInterval: 10000 } as any }
   );
 
   const refetch = () => { refetchStats(); refetchJobs(); };
