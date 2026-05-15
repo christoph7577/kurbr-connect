@@ -14,7 +14,7 @@ export const CTASection = () => (
       initial={{ opacity: 0, x: 40 }}
       whileInView={{ opacity: 0.15, x: 0 }}
       transition={springBolt}
-      className="absolute right-0 bottom-0 w-64 h-64 object-contain pointer-events-none"
+      className="absolute right-0 bottom-0 h-72 w-auto object-contain object-bottom pointer-events-none select-none"
     />
     <div className="container text-center relative z-10">
       <motion.h2
