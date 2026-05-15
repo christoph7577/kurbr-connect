@@ -1,0 +1,79 @@
+# KURBR Setup & Deployment Guide
+
+## Prerequisites
+
+- Node.js 18+
+- Supabase account
+- Anthropic API key
+- Replit account (for hosting)
+
+## Environment Variables
+
+Create `.env` file in root:
+
+```bash
+# Supabase
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Anthropic (AI Pricing)
+VITE_ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Stripe (when ready)
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_key
+STRIPE_SECRET_KEY=your_stripe_secret
+
+# Twilio (when ready)
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_PHONE_NUMBER=your_twilio_number
+```
+
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run dev server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Database Setup
+
+1. Create Supabase project
+2. Run migrations in `/supabase/migrations/`
+3. Enable Storage bucket: `job-photos`
+4. Set up RLS policies (already in migrations)
+
+## Deployment to Replit
+
+1. Import GitHub repo to Replit
+2. Add environment variables in Secrets
+3. Click "Deploy"
+4. Connect custom domain (optional)
+
+## Key Endpoints
+
+- `/` - Landing page
+- `/schedule` - Customer booking flow
+- `/hauler-onboarding` - Hauler signup
+- `/admin` - Admin dashboard (auth required)
+- `/tracking/:jobId` - Job status tracking
+
+## Troubleshooting
+
+**Issue:** Photos not uploading
+- Check Supabase Storage bucket exists
+- Verify RLS policies allow public upload
+
+**Issue:** AI pricing fails
+- Verify VITE_ANTHROPIC_API_KEY is set
+- Check API key has sufficient credits
+
+**Issue:** Database connection fails
+- Verify Supabase URL and anon key
+- Check RLS policies allow public access to necessary tables
