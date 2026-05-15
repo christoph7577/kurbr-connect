@@ -1,0 +1,43 @@
+4. Hauler replies YES
+5. Update job status to "dispatched"
+6. Send customer confirmation with hauler details
+
+## Dispatch Process (Automated - Week 3+)
+
+1. New job comes in
+2. AI matches nearest hauler based on:
+   - Distance from job
+   - Truck capacity vs. estimated volume
+   - Current availability
+   - Rating/acceptance history
+3. Automatic SMS sent to hauler
+4. Hauler replies YES or NO
+5. If NO, send to next best match
+6. Customer notified automatically
+
+## Quality Control
+
+**After Each Job:**
+- Hauler uploads before/after photos
+- Customer rates experience (1-5 stars)
+- Review for any issues
+- Release payment if job confirmed complete
+
+**Warning System:**
+- First issue: Verbal warning
+- Second issue: Written warning
+- Third issue: Suspension pending review
+- Fourth issue: Removal from platform
+
+## Payment to Haulers
+
+**Current (Manual):**
+- Hauler completes job
+- Sends before/after photos
+- Customer confirms completion
+- You Venmo/Zelle hauler 80% within 24 hours
+
+**Future (Automated with Stripe):**
+- Payment automatically sent to hauler bank account
+- 80% within 48 hours
+- Automatic 1099 tracking
