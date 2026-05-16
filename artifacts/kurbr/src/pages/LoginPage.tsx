@@ -1,4 +1,4 @@
-import { useClerk } from "@clerk/react";
+import { useClerk, useUser } from "@clerk/react";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import scrappyWaving from "@/assets/scrappy-waving.png";
 
 const LoginPage = () => {
   const clerk = useClerk();
+  const { isLoaded } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +18,7 @@ const LoginPage = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clerk.client?.signIn) return;
+    if (!isLoaded || !clerk.client?.signIn) return;
     setLoading(true);
     try {
       const result = await clerk.client.signIn.create({ identifier: email, password });
@@ -72,7 +73,7 @@ const LoginPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signIn}>
+          <Button type="submit" className="w-full" disabled={loading || !isLoaded}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Sign In
           </Button>

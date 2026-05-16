@@ -1,4 +1,4 @@
-import { useClerk } from "@clerk/react";
+import { useClerk, useUser } from "@clerk/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,14 @@ import { Loader2 } from "lucide-react";
 
 const ForgotPasswordPage = () => {
   const clerk = useClerk();
+  const { isLoaded } = useUser();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clerk.client?.signIn) return;
+    if (!isLoaded || !clerk.client?.signIn) return;
     setLoading(true);
     try {
       await clerk.client.signIn.create({
@@ -70,7 +71,7 @@ const ForgotPasswordPage = () => {
               className="bg-secondary border-border"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading || !clerk.client?.signIn}>
+          <Button type="submit" className="w-full" disabled={loading || !isLoaded}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Send Reset Code
           </Button>
