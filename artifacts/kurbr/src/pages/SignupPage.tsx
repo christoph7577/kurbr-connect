@@ -1,6 +1,6 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,6 @@ import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 const SignupPage = () => {
   const clerk = useClerk();
   const { isLoaded } = useUser();
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -25,16 +24,14 @@ const SignupPage = () => {
     if (!isLoaded || !clerk.client?.signUp) return;
     setLoading(true);
     try {
-      await clerk.client.signUp.create({
-        emailAddress: email,
-        password,
-      });
+      await clerk.client.signUp.create({ emailAddress: email, password });
       await clerk.client.signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err: unknown) {
-      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
-        ?? (err as { message?: string })?.message
-        ?? "Signup failed";
+      const msg =
+        (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+        (err as { message?: string })?.message ??
+        "Signup failed";
       toast({ title: "Signup failed", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -46,20 +43,18 @@ const SignupPage = () => {
     if (!isLoaded || !clerk.client?.signUp) return;
     setLoading(true);
     try {
-      const result = await clerk.client.signUp.attemptEmailAddressVerification({
-        code: verificationCode,
-      });
+      const result = await clerk.client.signUp.attemptEmailAddressVerification({ code: verificationCode });
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
-        toast({ title: "Welcome to KURBR!" });
-        navigate("/");
+        window.location.href = "/";
       } else {
-        toast({ title: "Verification incomplete", description: "Please try again.", variant: "destructive" });
+        toast({ title: "Verification incomplete", description: `Status: ${result.status}`, variant: "destructive" });
       }
     } catch (err: unknown) {
-      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
-        ?? (err as { message?: string })?.message
-        ?? "Verification failed";
+      const msg =
+        (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+        (err as { message?: string })?.message ??
+        "Verification failed";
       toast({ title: "Verification failed", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -127,7 +122,6 @@ const SignupPage = () => {
               placeholder="John Doe"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              required
               className="bg-secondary border-border"
             />
           </div>

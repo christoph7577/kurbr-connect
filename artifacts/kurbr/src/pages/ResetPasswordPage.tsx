@@ -1,18 +1,18 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const ResetPasswordPage = () => {
   const clerk = useClerk();
   const { isLoaded } = useUser();
-  const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -27,15 +27,15 @@ const ResetPasswordPage = () => {
       });
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
-        toast({ title: "Password updated!" });
-        navigate("/");
+        window.location.href = "/";
       } else {
-        toast({ title: "Could not reset password", description: "Please try again.", variant: "destructive" });
+        toast({ title: "Could not reset password", description: `Status: ${result.status}`, variant: "destructive" });
       }
     } catch (err: unknown) {
-      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
-        ?? (err as { message?: string })?.message
-        ?? "Failed to reset password";
+      const msg =
+        (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+        (err as { message?: string })?.message ??
+        "Failed to reset password";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -64,15 +64,25 @@ const ResetPasswordPage = () => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">New Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="bg-secondary border-border"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                className="bg-secondary border-border pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading || !isLoaded}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

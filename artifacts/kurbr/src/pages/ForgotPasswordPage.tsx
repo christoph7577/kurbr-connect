@@ -25,9 +25,10 @@ const ForgotPasswordPage = () => {
       });
       setSent(true);
     } catch (err: unknown) {
-      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
-        ?? (err as { message?: string })?.message
-        ?? "Failed to send reset email";
+      const msg =
+        (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+        (err as { message?: string })?.message ??
+        "Failed to send reset email";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);

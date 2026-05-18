@@ -1,6 +1,6 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,6 @@ import scrappyWaving from "@/assets/scrappy-waving.png";
 const LoginPage = () => {
   const clerk = useClerk();
   const { isLoaded } = useUser();
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,13 +24,20 @@ const LoginPage = () => {
       const result = await clerk.client.signIn.create({ identifier: email, password });
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
-        toast({ title: "Welcome back!" });
-        navigate("/");
+        // Full reload so Clerk re-initialises with the new session
+        window.location.href = "/";
+      } else {
+        toast({
+          title: "Sign in incomplete",
+          description: `Status: ${result.status} — please try again or contact support.`,
+          variant: "destructive",
+        });
       }
     } catch (err: unknown) {
-      const msg = (err as { errors?: { longMessage?: string }[]; message?: string })?.errors?.[0]?.longMessage
-        ?? (err as { message?: string })?.message
-        ?? "Login failed";
+      const msg =
+        (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+        (err as { message?: string })?.message ??
+        "Login failed";
       toast({ title: "Login failed", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
