@@ -78,6 +78,40 @@ router.post("/profile/bootstrap-admin", requireAuth, async (req: Request, res: R
   }
 });
 
+// GET /api/profile/clerk-diag — list all users + instance settings
+router.get("/profile/clerk-diag", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const allUsers = await clerkClient.users.getUserList({ limit: 50 });
+    const usersSummary = allUsers.data.map((u) => {
+      const x = u as unknown as { id: string; emailAddresses: { emailAddress: string }[]; totpEnabled?: boolean; backupCodeEnabled?: boolean; twoFactorEnabled?: boolean; phoneNumbers?: { phoneNumber: string; reservedForSecondFactor?: boolean }[] };
+      return {
+        id: x.id,
+        emails: x.emailAddresses.map((e) => e.emailAddress),
+        totpEnabled: x.totpEnabled,
+        backupCodeEnabled: x.backupCodeEnabled,
+        twoFactorEnabled: x.twoFactorEnabled,
+        phones: x.phoneNumbers?.map((p) => ({ num: p.phoneNumber, secondFactor: p.reservedForSecondFactor })),
+      };
+    });
+
+    // Fetch instance settings via raw API
+    const instRes = await fetch("https://api.clerk.com/v1/instance", {
+      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+    });
+    const instance = instRes.ok ? await instRes.json() : { error: `instance ${instRes.status}: ${await instRes.text()}` };
+
+    // Fetch auth config
+    const acRes = await fetch("https://api.clerk.com/v1/beta_features/instance_settings", {
+      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+    });
+    const authConfig = acRes.ok ? await acRes.json() : { error: `auth_config ${acRes.status}: ${await acRes.text()}` };
+
+    res.json({ users: usersSummary, totalCount: allUsers.totalCount, instance, authConfig });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // POST /api/profile/remove-mfa — one-shot: removes all TOTP/phone MFA factors
 // for the account matching a specific email. Locked to owner email only.
 // Remove this endpoint after use.
