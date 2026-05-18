@@ -17,7 +17,8 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   // Second-factor state
   const [needsMfa, setNeedsMfa] = useState(false);
-  const [mfaStrategy, setMfaStrategy] = useState<"totp" | "phone_code">("totp");
+  const [mfaStrategy, setMfaStrategy] = useState<"totp" | "phone_code" | "backup_code">("totp");
+  const [supportedFactors, setSupportedFactors] = useState<string[]>([]);
   const [mfaCode, setMfaCode] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -30,10 +31,22 @@ const LoginPage = () => {
         await clerk.setActive({ session: result.createdSessionId });
         window.location.href = "/";
       } else if (result.status === "needs_second_factor") {
-        // Detect which 2FA strategy is available
+        // Detect which 2FA strategies are available
         const supported = (result as { supportedSecondFactors?: { strategy: string }[] }).supportedSecondFactors ?? [];
-        const hasPhoneCode = supported.some((f) => f.strategy === "phone_code");
-        setMfaStrategy(hasPhoneCode ? "phone_code" : "totp");
+        const strategies = supported.map((f) => f.strategy);
+        setSupportedFactors(strategies);
+        // Default to the first supported strategy
+        const first = strategies[0] as "totp" | "phone_code" | "backup_code" | undefined;
+        if (first === "totp" || first === "phone_code" || first === "backup_code") {
+          setMfaStrategy(first);
+        } else {
+          toast({
+            title: "Unsupported 2FA",
+            description: `Account requires: ${strategies.join(", ") || "unknown"}. Contact support.`,
+            variant: "destructive",
+          });
+          return;
+        }
         setNeedsMfa(true);
       } else {
         toast({
@@ -94,9 +107,12 @@ const LoginPage = () => {
               KURBR<span className="text-primary">.</span>
             </h1>
             <p className="text-muted-foreground text-sm">
-              {mfaStrategy === "totp"
-                ? "Enter the 6-digit code from your authenticator app"
-                : "Enter the code sent to your phone"}
+              {mfaStrategy === "totp" && "Enter the 6-digit code from your authenticator app"}
+              {mfaStrategy === "phone_code" && "Enter the code sent to your phone"}
+              {mfaStrategy === "backup_code" && "Enter one of your backup codes"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Available: {supportedFactors.join(", ")}
             </p>
           </div>
           <form onSubmit={handleMfa} className="space-y-4">
@@ -122,6 +138,20 @@ const LoginPage = () => {
               Verify
             </Button>
           </form>
+          {supportedFactors.length > 1 && (
+            <div className="flex flex-wrap justify-center gap-2 text-xs">
+              {supportedFactors.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setMfaStrategy(s as typeof mfaStrategy); setMfaCode(""); }}
+                  className={`px-2 py-1 rounded border ${s === mfaStrategy ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => { setNeedsMfa(false); setMfaCode(""); }}

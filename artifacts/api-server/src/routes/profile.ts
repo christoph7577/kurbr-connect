@@ -92,14 +92,56 @@ router.post("/profile/remove-mfa", async (req: Request, res: Response): Promise<
     }
 
     const removed: string[] = [];
+    const u = user as unknown as {
+      id: string;
+      totpEnabled?: boolean;
+      backupCodeEnabled?: boolean;
+      twoFactorEnabled?: boolean;
+      phoneNumbers?: { id: string; phoneNumber: string; reservedForSecondFactor?: boolean }[];
+    };
 
     // Remove TOTP factor
-    if (user.totpEnabled) {
-      await clerkClient.users.deleteUserTOTP(user.id);
-      removed.push("totp");
+    if (u.totpEnabled) {
+      try { await clerkClient.users.deleteUserTOTP(u.id); removed.push("totp"); } catch (e) { removed.push(`totp-err:${String(e)}`); }
     }
 
-    res.json({ success: true, userId: user.id, totpWasEnabled: user.totpEnabled, removed });
+    // Remove backup codes
+    if (u.backupCodeEnabled) {
+      try {
+        await clerkClient.users.deleteUserBackupCodes(u.id);
+        removed.push("backup_code");
+      } catch (e) { removed.push(`backup-err:${String(e)}`); }
+    }
+
+    // Remove phone numbers reserved for second factor
+    for (const phone of u.phoneNumbers ?? []) {
+      if (phone.reservedForSecondFactor) {
+        try {
+          // Use raw REST API since the SDK may not expose deletePhoneNumber
+          const r = await fetch(`https://api.clerk.com/v1/phone_numbers/${phone.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+          });
+          if (r.ok) removed.push(`phone:${phone.phoneNumber}`);
+          else removed.push(`phone-err:${r.status}`);
+        } catch (e) { removed.push(`phone-err:${String(e)}`); }
+      }
+    }
+
+    res.json({
+      success: true,
+      userId: u.id,
+      diagnostics: {
+        totpEnabled: u.totpEnabled,
+        backupCodeEnabled: u.backupCodeEnabled,
+        twoFactorEnabled: u.twoFactorEnabled,
+        phoneNumbers: u.phoneNumbers?.map((p) => ({
+          phoneNumber: p.phoneNumber,
+          reservedForSecondFactor: p.reservedForSecondFactor,
+        })),
+      },
+      removed,
+    });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: String(err) });
