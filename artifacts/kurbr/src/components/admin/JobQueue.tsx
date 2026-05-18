@@ -9,6 +9,14 @@ export interface AiEstimate {
   price_min?: number;
   price_max?: number;
   price_estimated?: number;
+  price_breakdown?: {
+    rate_cents_per_cuyd?: number;
+    volume_cuyd?: number;
+    difficulty?: number;
+    difficulty_multiplier?: number;
+    base_cents?: number;
+    formula?: string;
+  };
 }
 
 export interface Job {

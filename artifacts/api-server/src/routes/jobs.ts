@@ -326,6 +326,14 @@ Respond ONLY with valid JSON (no markdown) containing:
       price_min: Math.max(8900, Math.round(baseCents * 0.85)),
       price_max: Math.round(baseCents * 1.20),
       price_estimated: baseCents,
+      price_breakdown: {
+        rate_cents_per_cuyd: RATE_CENTS_PER_CUYD,
+        volume_cuyd: cuYards,
+        difficulty: difficulty,
+        difficulty_multiplier: Number(diffMultiplier.toFixed(2)),
+        base_cents: baseCents,
+        formula: `$${(RATE_CENTS_PER_CUYD / 100).toFixed(0)}/cu yd × ${cuYards} cu yd × ${diffMultiplier.toFixed(2)} (difficulty ${difficulty}/5) = $${(baseCents / 100).toFixed(0)}`,
+      },
     };
 
     res.json(estimate);

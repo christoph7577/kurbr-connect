@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Loader2, MapPin, User, Phone, Truck, CheckCircle, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Loader2, MapPin, User, Phone, Truck, CheckCircle, ArrowLeft, Sparkles } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { apiGet, apiPatch } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PhotoLightbox } from "@/components/admin/PhotoLightbox";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -26,9 +26,11 @@ interface Job {
     estimated_volume?: string;
     item_list?: string[];
     difficulty_score?: number;
+    reasoning?: string;
     price_min?: number;
     price_max?: number;
     price_estimated?: number;
+    price_breakdown?: { formula?: string };
   } | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
@@ -65,9 +67,13 @@ const DispatchDashboard = () => {
   const [haulers, setHaulers] = useState<Hauler[]>([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>("dispatch");
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusJobId = searchParams.get("jobId");
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastScrolledIdRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const controller = new AbortController();
@@ -104,7 +110,6 @@ const DispatchDashboard = () => {
     try {
       await apiPatch(`/jobs/${job.id}`, { haulerId, status: "dispatched" });
       toast.success(`Job ${job.jobNumber} dispatched`);
-      setSelectedJob(null);
       await fetchData();
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to assign hauler");
@@ -112,6 +117,22 @@ const DispatchDashboard = () => {
       setAssigning(null);
     }
   };
+
+  // Scroll/highlight a job when arriving with ?jobId=... (re-runs for each new jobId in-session)
+  useEffect(() => {
+    if (!focusJobId || jobs.length === 0) return;
+    if (lastScrolledIdRef.current === focusJobId) return;
+    const el = cardRefs.current[focusJobId];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    lastScrolledIdRef.current = focusJobId;
+    const handle = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("jobId");
+      setSearchParams(next, { replace: true });
+    }, 3000);
+    return () => clearTimeout(handle);
+  }, [focusJobId, jobs, searchParams, setSearchParams]);
 
   const sortedHaulers = (job: Job) =>
     [...haulers].sort((a, b) => countAreaMatch(b, job.address) - countAreaMatch(a, job.address));
@@ -163,29 +184,46 @@ const DispatchDashboard = () => {
                 return (
                   <motion.div
                     key={job.id}
+                    ref={(el) => { cardRefs.current[job.id] = el; }}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={springBolt}
-                    className="border-milled overflow-hidden"
+                    className={`border-milled overflow-hidden transition-all ${
+                      focusJobId === job.id ? "ring-2 ring-primary shadow-lg" : ""
+                    }`}
                   >
                     {/* Photo strip */}
                     {job.photos && job.photos.length > 0 && (
                       <div className="flex gap-0.5 h-28">
                         {job.photos.slice(0, 3).map((url, i) => (
-                          <div key={i} className="flex-1 overflow-hidden bg-secondary">
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setLightbox({ photos: job.photos as string[], index: i })}
+                            className="flex-1 overflow-hidden bg-secondary cursor-zoom-in hover:opacity-80 transition-opacity"
+                            title="Click to enlarge"
+                          >
                             <img
                               src={url}
-                              alt=""
+                              alt={`Job photo ${i + 1}`}
                               loading="lazy"
                               className="w-full h-full object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              onError={(e) => {
+                                const el = e.target as HTMLImageElement;
+                                el.style.opacity = "0.3";
+                              }}
                             />
-                          </div>
+                          </button>
                         ))}
                         {job.photos.length > 3 && (
-                          <div className="w-10 bg-secondary flex items-center justify-center">
-                            <span className="text-xs font-mono text-muted-foreground">+{job.photos.length - 3}</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setLightbox({ photos: job.photos as string[], index: 3 })}
+                            className="w-10 bg-secondary flex items-center justify-center hover:bg-secondary/70 transition-colors"
+                            title="View all photos"
+                          >
+                            <span className="text-xs font-mono text-muted-foreground">+{(job.photos?.length ?? 0) - 3}</span>
+                          </button>
                         )}
                       </div>
                     )}
@@ -246,6 +284,22 @@ const DispatchDashboard = () => {
                         </div>
                       </div>
 
+                      {/* AI reasoning + formula */}
+                      {(job.aiEstimate?.reasoning || job.aiEstimate?.price_breakdown?.formula) && (
+                        <div className="bg-secondary/30 p-2 space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3 text-primary" />
+                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">AI Pricing</span>
+                          </div>
+                          {job.aiEstimate?.reasoning && (
+                            <p className="text-xs text-foreground leading-relaxed">{job.aiEstimate.reasoning}</p>
+                          )}
+                          {job.aiEstimate?.price_breakdown?.formula && (
+                            <p className="text-[10px] font-mono text-muted-foreground">{job.aiEstimate.price_breakdown.formula}</p>
+                          )}
+                        </div>
+                      )}
+
                       {/* Hauler assignment */}
                       <div className="space-y-2">
                         <p className="text-xs uppercase tracking-widest text-muted-foreground">Assign Hauler</p>
@@ -293,6 +347,15 @@ const DispatchDashboard = () => {
           )}
         </div>
       </div>
+
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onChange={(i) => setLightbox({ ...lightbox, index: i })}
+        />
+      )}
     </div>
   );
 };

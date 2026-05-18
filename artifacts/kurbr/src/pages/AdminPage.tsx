@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Bell, Menu, Loader2, Download, TrendingUp, ExternalLink, CheckCircle, Mail, Trash2, Trash } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
@@ -69,6 +70,7 @@ function exportCsv(jobs: Job[]) {
 }
 
 const AdminPage = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>(() => {
     const view = new URLSearchParams(window.location.search).get("view") as AdminView;
@@ -383,11 +385,19 @@ const AdminPage = () => {
                         <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono">{filteredJobs.length} jobs</p>
                       </div>
                       <div className="border-milled divide-y divide-border">
-                        {filteredJobs.slice(0, 30).map((job) => (
+                        {filteredJobs.slice(0, 30).map((job) => {
+                          const dispatchable = job.status === "pending" || job.status === "confirmed";
+                          return (
                           <div
                             key={job.dbId}
                             className={`flex items-center justify-between p-3 group cursor-pointer hover:bg-secondary/20 transition-colors ${selectedJob?.dbId === job.dbId ? "bg-secondary/20" : ""}`}
-                            onClick={() => handleSelectJob(job)}
+                            onClick={() => {
+                              if (dispatchable) {
+                                navigate(`/dispatch?jobId=${job.dbId}`);
+                              } else {
+                                handleSelectJob(job);
+                              }
+                            }}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="font-mono text-xs font-bold w-24 shrink-0">{job.id}</span>
@@ -441,7 +451,8 @@ const AdminPage = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       {filteredJobs.length > 30 && (
                         <p className="text-xs text-muted-foreground font-mono text-center mt-3">

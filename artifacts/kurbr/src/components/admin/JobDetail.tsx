@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { toast } from "sonner";
 import type { Job } from "./JobQueue";
+import { PhotoLightbox } from "./PhotoLightbox";
 
 interface ContactNote {
   id: string;
@@ -45,6 +46,7 @@ export const JobDetail = ({ job, onUpdate, onDelete }: JobDetailProps) => {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showHaulerPicker, setShowHaulerPicker] = useState(false);
   const [haulers, setHaulers] = useState<Hauler[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [loadingHaulers, setLoadingHaulers] = useState(false);
   const [contactNotes, setContactNotes] = useState<ContactNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -264,21 +266,25 @@ export const JobDetail = ({ job, onUpdate, onDelete }: JobDetailProps) => {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {job.photos.map((url, i) => (
-                <a
+                <button
                   key={i}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block aspect-square bg-secondary overflow-hidden hover:opacity-80 transition-opacity"
-                  title="Open full size"
+                  type="button"
+                  onClick={() => setLightboxIndex(i)}
+                  className="block aspect-square bg-secondary overflow-hidden hover:opacity-80 transition-opacity cursor-zoom-in"
+                  title="Click to enlarge"
                 >
                   <img
                     src={url}
                     alt={`Job photo ${i + 1}`}
                     loading="lazy"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const el = e.target as HTMLImageElement;
+                      el.style.opacity = "0.3";
+                      el.alt = "Failed to load";
+                    }}
                   />
-                </a>
+                </button>
               ))}
             </div>
           </div>
@@ -334,8 +340,25 @@ export const JobDetail = ({ job, onUpdate, onDelete }: JobDetailProps) => {
                   <p className="text-xs text-foreground leading-relaxed">{job.aiEstimate.reasoning}</p>
                 </div>
               )}
+              {job.aiEstimate.price_breakdown?.formula && (
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-1">Pricing Formula</div>
+                  <p className="text-xs font-mono text-foreground bg-background/50 px-2 py-1.5">
+                    {job.aiEstimate.price_breakdown.formula}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+        )}
+
+        {lightboxIndex !== null && job.photos && (
+          <PhotoLightbox
+            photos={job.photos}
+            index={lightboxIndex}
+            onClose={() => setLightboxIndex(null)}
+            onChange={setLightboxIndex}
+          />
         )}
 
         {/* Contact log */}

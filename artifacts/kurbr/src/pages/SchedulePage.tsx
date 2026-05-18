@@ -24,6 +24,14 @@ interface AiEstimate {
   price_min: number;
   price_max: number;
   price_estimated: number;
+  price_breakdown?: {
+    rate_cents_per_cuyd?: number;
+    volume_cuyd?: number;
+    difficulty?: number;
+    difficulty_multiplier?: number;
+    base_cents?: number;
+    formula?: string;
+  };
 }
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -386,6 +394,14 @@ const SchedulePage = () => {
                       <div>
                         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Why this estimate</p>
                         <p className="text-sm text-foreground leading-relaxed">{aiEstimate.reasoning}</p>
+                      </div>
+                    )}
+                    {aiEstimate.price_breakdown?.formula && (
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">How we calculated it</p>
+                        <p className="text-xs font-mono text-foreground bg-secondary/40 px-3 py-2">
+                          {aiEstimate.price_breakdown.formula}
+                        </p>
                       </div>
                     )}
                     <div className="flex items-end justify-between border-t border-border pt-4">
