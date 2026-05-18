@@ -78,4 +78,32 @@ router.post("/profile/bootstrap-admin", requireAuth, async (req: Request, res: R
   }
 });
 
+// POST /api/profile/remove-mfa — one-shot: removes all TOTP/phone MFA factors
+// for the account matching a specific email. Locked to owner email only.
+// Remove this endpoint after use.
+router.post("/profile/remove-mfa", async (req: Request, res: Response): Promise<void> => {
+  const OWNER_EMAIL = "Christoph7577@gmail.com";
+  try {
+    const users = await clerkClient.users.getUserList({ emailAddress: [OWNER_EMAIL] });
+    const user = users.data?.[0];
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const removed: string[] = [];
+
+    // Remove TOTP factor
+    if (user.totpEnabled) {
+      await clerkClient.users.deleteUserTOTP(user.id);
+      removed.push("totp");
+    }
+
+    res.json({ success: true, userId: user.id, totpWasEnabled: user.totpEnabled, removed });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 export default router;
