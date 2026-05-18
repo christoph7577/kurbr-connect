@@ -277,7 +277,8 @@ ${description ? `Customer description: ${description}` : ""}
 Respond ONLY with valid JSON (no markdown) containing:
 - estimated_volume: string ("1/8 truck", "1/4 truck", "1/3 truck", "1/2 truck", "3/4 truck", or "full truck")
 - item_list: string[] (visible item categories)
-- difficulty_score: integer 1-5 (1=easy light items, 5=very heavy/difficult)`;
+- difficulty_score: integer 1-5 (1=easy light items, 5=very heavy/difficult)
+- reasoning: string (2-3 short sentences explaining the volume estimate, what drove the difficulty score, and any notable factors like heavy items, stairs, hazards, or access constraints. Plain English, no markdown.)`;
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
@@ -295,6 +296,7 @@ Respond ONLY with valid JSON (no markdown) containing:
       estimated_volume: "1/2 truck",
       item_list: ["Mixed items"],
       difficulty_score: 3,
+      reasoning: "Estimate generated from photo analysis.",
     };
     try {
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
@@ -462,7 +464,7 @@ router.post("/jobs", bookingLimiter, async (req: Request, res: Response): Promis
   try {
     const {
       serviceType, address, scheduledDate, scheduledTime, description,
-      customerName, customerEmail, customerPhone, photos, smsOptIn,
+      customerName, customerEmail, customerPhone, photos, smsOptIn, aiEstimate,
     } = req.body as Record<string, unknown>;
     if (typeof serviceType !== "string" || !serviceType || typeof address !== "string" || !address) {
       res.status(400).json({ error: "serviceType and address are required" });
@@ -485,7 +487,8 @@ router.post("/jobs", bookingLimiter, async (req: Request, res: Response): Promis
       customerPhone: typeof customerPhone === "string" ? customerPhone : null,
       priceCents: null, // Price is set by admin after review — not trusted from client
       photos: validatedPhotos && validatedPhotos.length > 0 ? validatedPhotos : null,
-      aiEstimate: null, // Not stored at booking time; admin sets final price
+      // AI estimate is informational for admin review; admin sets the final price.
+      aiEstimate: aiEstimate && typeof aiEstimate === "object" ? (aiEstimate as Record<string, unknown>) : null,
       smsOptIn: smsOptIn === true,
       status: "pending",
     }).returning();

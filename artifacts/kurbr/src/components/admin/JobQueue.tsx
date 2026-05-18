@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, MoreHorizontal, Eye, CheckCircle, Trash2 } from "lucide-react";
 
+export interface AiEstimate {
+  estimated_volume?: string;
+  item_list?: string[];
+  difficulty_score?: number;
+  reasoning?: string;
+  price_min?: number;
+  price_max?: number;
+  price_estimated?: number;
+}
+
 export interface Job {
   id: string;
   dbId: string;
@@ -16,6 +26,8 @@ export interface Job {
   customerEmail: string | null;
   customerPhone: string | null;
   scheduledDate: string | null;
+  photos: string[] | null;
+  aiEstimate: AiEstimate | null;
 }
 
 const statusColors: Record<string, string> = {

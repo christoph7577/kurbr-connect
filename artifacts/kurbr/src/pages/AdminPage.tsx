@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Bell, Menu, Loader2, Download, TrendingUp, ExternalLink, CheckCircle, Mail, Trash2, Trash } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
-import { JobQueue, type Job } from "@/components/admin/JobQueue";
+import { JobQueue, type Job, type AiEstimate } from "@/components/admin/JobQueue";
 import { JobDetail } from "@/components/admin/JobDetail";
 import { HaulerManagement } from "@/components/admin/HaulerManagement";
 import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
@@ -42,6 +42,10 @@ const mapJob = (j: Record<string, unknown>): Job => ({
   customerEmail: (j["customerEmail"] as string) || null,
   customerPhone: (j["customerPhone"] as string) || null,
   scheduledDate: (j["scheduledDate"] as string) || null,
+  photos: Array.isArray(j["photos"]) ? (j["photos"] as string[]) : null,
+  aiEstimate: j["aiEstimate"] && typeof j["aiEstimate"] === "object"
+    ? (j["aiEstimate"] as AiEstimate)
+    : null,
 });
 
 function exportCsv(jobs: Job[]) {

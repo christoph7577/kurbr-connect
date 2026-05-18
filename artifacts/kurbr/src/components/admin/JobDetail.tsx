@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus, Phone, MessageSquare, Trash2 } from "lucide-react";
+import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus, Phone, MessageSquare, Trash2, Sparkles, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { toast } from "sonner";
@@ -252,6 +252,91 @@ export const JobDetail = ({ job, onUpdate, onDelete }: JobDetailProps) => {
             </div>
           )}
         </div>
+
+        {/* Customer photos */}
+        {job.photos && job.photos.length > 0 && (
+          <div className="border-t border-border pt-4 mt-2">
+            <div className="flex items-center gap-2 mb-3">
+              <ImageIcon className="w-3 h-3 text-muted-foreground" />
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                Customer Photos ({job.photos.length})
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {job.photos.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block aspect-square bg-secondary overflow-hidden hover:opacity-80 transition-opacity"
+                  title="Open full size"
+                >
+                  <img
+                    src={url}
+                    alt={`Job photo ${i + 1}`}
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI pricing breakdown */}
+        {job.aiEstimate && (
+          <div className="border-t border-border pt-4 mt-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-3 h-3 text-primary" />
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">AI Pricing Analysis</span>
+            </div>
+            <div className="bg-secondary/30 p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                {job.aiEstimate.estimated_volume && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">Volume</div>
+                    <div className="text-sm font-mono font-bold">{job.aiEstimate.estimated_volume}</div>
+                  </div>
+                )}
+                {typeof job.aiEstimate.difficulty_score === "number" && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">Difficulty</div>
+                    <div className="text-sm font-mono font-bold">{job.aiEstimate.difficulty_score}/5</div>
+                  </div>
+                )}
+                {typeof job.aiEstimate.price_estimated === "number" && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">AI Estimate</div>
+                    <div className="text-sm font-mono font-bold text-primary">
+                      ${(job.aiEstimate.price_estimated / 100).toFixed(0)}
+                    </div>
+                  </div>
+                )}
+                {typeof job.aiEstimate.price_min === "number" && typeof job.aiEstimate.price_max === "number" && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">Range</div>
+                    <div className="text-sm font-mono">
+                      ${(job.aiEstimate.price_min / 100).toFixed(0)}–${(job.aiEstimate.price_max / 100).toFixed(0)}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {job.aiEstimate.item_list && job.aiEstimate.item_list.length > 0 && (
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-1">Items Detected</div>
+                  <p className="text-xs font-mono text-foreground">{job.aiEstimate.item_list.join(", ")}</p>
+                </div>
+              )}
+              {job.aiEstimate.reasoning && (
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-1">Reasoning</div>
+                  <p className="text-xs text-foreground leading-relaxed">{job.aiEstimate.reasoning}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Contact log */}
         <div className="border-t border-border pt-4 mt-2">

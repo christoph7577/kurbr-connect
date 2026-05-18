@@ -20,6 +20,7 @@ interface AiEstimate {
   estimated_volume: string;
   item_list: string[];
   difficulty_score: number;
+  reasoning?: string;
   price_min: number;
   price_max: number;
   price_estimated: number;
@@ -176,6 +177,7 @@ const SchedulePage = () => {
         customerPhone: phone || null,
         photos: uploadedUrls.length > 0 ? uploadedUrls : null,
         smsOptIn,
+        aiEstimate: aiEstimate ?? null,
       });
       toast.success("Booking confirmed!");
       navigate(`/tracking?token=${job.trackingToken}`);
@@ -380,6 +382,12 @@ const SchedulePage = () => {
                       <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Items detected</p>
                       <p className="text-sm font-mono text-muted-foreground">{aiEstimate.item_list.join(", ")}</p>
                     </div>
+                    {aiEstimate.reasoning && (
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Why this estimate</p>
+                        <p className="text-sm text-foreground leading-relaxed">{aiEstimate.reasoning}</p>
+                      </div>
+                    )}
                     <div className="flex items-end justify-between border-t border-border pt-4">
                       <div>
                         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Price Range</p>
