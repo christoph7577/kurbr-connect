@@ -12,22 +12,18 @@ interface AdminSidebarProps {
   onChangeView: (view: AdminView) => void;
 }
 
-const navItems: { icon: typeof LayoutDashboard; label: string; view: AdminView; href?: string }[] = [
-  { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
+const navItems: { icon: typeof LayoutDashboard; label: string; view: AdminView; href: string }[] = [
+  { icon: LayoutDashboard, label: "Dashboard", view: "dashboard", href: "/admin" },
   { icon: Radio, label: "Dispatch", view: "dispatch", href: "/dispatch" },
-  { icon: Users, label: "Haulers", view: "haulers" },
+  { icon: Users, label: "Haulers", view: "haulers", href: "/admin?view=haulers" },
 ];
 
 export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminSidebarProps) => {
   const { signOut } = useAuth();
-  const navigate = useNavigate();
 
   const handleNav = (item: typeof navItems[number]) => {
     onChangeView(item.view);
     onClose();
-    if (item.href) {
-      navigate(item.href);
-    }
   };
 
   return (
@@ -45,8 +41,9 @@ export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminS
         </div>
         <nav className="flex-1 px-3">
           {navItems.map((item) => (
-            <button
+            <Link
               key={item.view}
+              to={item.href}
               onClick={() => handleNav(item)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm mb-1 transition-colors ${
                 activeView === item.view
@@ -56,7 +53,7 @@ export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminS
             >
               <item.icon className="w-4 h-4" />
               <span className="uppercase tracking-widest text-xs">{item.label}</span>
-            </button>
+            </Link>
           ))}
         </nav>
         <div className="p-3 border-t border-sidebar-border">

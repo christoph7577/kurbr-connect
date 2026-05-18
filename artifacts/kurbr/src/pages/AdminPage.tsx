@@ -65,7 +65,10 @@ function exportCsv(jobs: Job[]) {
 
 const AdminPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeView, setActiveView] = useState<AdminView>("dashboard");
+  const [activeView, setActiveView] = useState<AdminView>(() => {
+    const view = new URLSearchParams(window.location.search).get("view") as AdminView;
+    return ["dashboard", "haulers"].includes(view) ? view : "dashboard";
+  });
   const [jobs, setJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<JobStats | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);

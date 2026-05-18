@@ -69,6 +69,8 @@ const DispatchDashboard = () => {
   const [activeView, setActiveView] = useState<AdminView>("dispatch");
 
   const fetchData = useCallback(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const [jobsData, haulersData] = await Promise.all([
         apiGet<Job[]>("/jobs?status=pending"),
@@ -83,8 +85,9 @@ const DispatchDashboard = () => {
       setJobs(allPending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setHaulers(haulersData);
     } catch (err) {
-      console.error(err);
+      if ((err as Error).name !== "AbortError") console.error(err);
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }, []);
@@ -168,7 +171,13 @@ const DispatchDashboard = () => {
                       <div className="flex gap-0.5 h-28">
                         {job.photos.slice(0, 3).map((url, i) => (
                           <div key={i} className="flex-1 overflow-hidden bg-secondary">
-                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <img
+                              src={url}
+                              alt=""
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
                           </div>
                         ))}
                         {job.photos.length > 3 && (
