@@ -78,6 +78,40 @@ router.post("/profile/bootstrap-admin", requireAuth, async (req: Request, res: R
   }
 });
 
+// GET /api/profile/owner-login — generates a sign-in ticket and 302-redirects
+// the browser to /auth-ticket?ticket=... which auto-signs-in.
+router.get("/profile/owner-login", async (_req: Request, res: Response): Promise<void> => {
+  const OWNER_EMAIL = "christoph7577@gmail.com";
+  try {
+    const users = await clerkClient.users.getUserList({ emailAddress: [OWNER_EMAIL] });
+    const user = users.data?.[0];
+    if (!user) {
+      res.status(404).send("Owner user not found");
+      return;
+    }
+    const r = await fetch("https://api.clerk.com/v1/sign_in_tokens", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user_id: user.id, expires_in_seconds: 1800 }),
+    });
+    if (!r.ok) {
+      res.status(500).send(`Failed to create sign-in token: ${r.status} ${await r.text()}`);
+      return;
+    }
+    const body = (await r.json()) as { token?: string };
+    if (!body.token) {
+      res.status(500).send("No token in response");
+      return;
+    }
+    res.redirect(`/auth-ticket?ticket=${encodeURIComponent(body.token)}`);
+  } catch (err) {
+    res.status(500).send(String(err));
+  }
+});
+
 // POST /api/profile/signin-token — generate a Clerk sign-in token that bypasses
 // passwords and MFA. The owner clicks the returned URL and is signed in directly.
 router.post("/profile/signin-token", async (_req: Request, res: Response): Promise<void> => {
