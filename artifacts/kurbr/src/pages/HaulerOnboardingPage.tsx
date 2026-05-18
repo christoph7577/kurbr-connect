@@ -17,6 +17,7 @@ import { apiPost } from "@/lib/apiClient";
 import { toast } from "sonner";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -153,9 +154,12 @@ const HaulerOnboardingPage = () => {
           <Link to="/" className="text-xl font-bold tracking-[-0.06em]">
             KURBR<span className="text-primary">.</span>
           </Link>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono">
-            Hauler Application
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono hidden sm:block">
+              Hauler Application
+            </p>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 

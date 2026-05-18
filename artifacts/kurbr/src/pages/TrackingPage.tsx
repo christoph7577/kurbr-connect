@@ -4,6 +4,7 @@ import { ArrowLeft, Search, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiGet } from "@/lib/apiClient";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -206,7 +207,7 @@ const TrackingPage = () => {
               <span className="text-xs uppercase tracking-widest">Back</span>
             </Link>
             <p className="text-xl font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></p>
-            <div className="w-16" />
+            <div className="w-16 flex justify-end"><ThemeToggle /></div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col items-center justify-center px-6">
@@ -258,7 +259,10 @@ const TrackingPage = () => {
               <span className="text-xs uppercase tracking-widest">Back</span>
             </Link>
             <p className="text-xl font-bold tracking-[-0.06em]">KURBR<span className="text-primary">.</span></p>
-            <p className="text-xs font-mono text-muted-foreground">{job!.jobNumber}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-mono text-muted-foreground">{job!.jobNumber}</p>
+              <ThemeToggle />
+            </div>
           </div>
         </nav>
 

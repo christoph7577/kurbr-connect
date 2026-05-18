@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import scrappyDriving from "@/assets/scrappy-driving.png";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const STATUS_FLOW = ["confirmed", "dispatched", "en_route", "arrived", "completed"] as const;
 const STATUS_LABELS: Record<string, string> = {
@@ -233,6 +234,7 @@ const HaulerDashboardPage = () => {
             ← Back
           </button>
           <span className="ml-auto font-mono text-sm text-muted-foreground">{selectedJob.job_number}</span>
+          <ThemeToggle />
         </header>
 
         <div className="p-4 space-y-4 max-w-lg mx-auto">
@@ -261,7 +263,7 @@ const HaulerDashboardPage = () => {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sharingLocation ? "bg-green-500" : "bg-secondary border border-border"}`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sharingLocation ? "translate-x-6" : "translate-x-1"}`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform ${sharingLocation ? "translate-x-6" : "translate-x-1"}`}
                 />
               </button>
             </div>
@@ -350,6 +352,7 @@ const HaulerDashboardPage = () => {
               Live
             </div>
           )}
+          <ThemeToggle />
           <button onClick={signOut} className="text-muted-foreground">
             <LogOut className="w-5 h-5" />
           </button>

@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { ClerkProvider } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import App from "./App.tsx";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import "./index.css";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -14,7 +15,9 @@ if (!clerkPubKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 createRoot(document.getElementById("root")!).render(
-  <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
-    <App />
-  </ClerkProvider>
+  <ThemeProvider>
+    <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+      <App />
+    </ClerkProvider>
+  </ThemeProvider>
 );

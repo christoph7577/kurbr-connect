@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Navbar = () => (
   <nav className="fixed top-0 left-0 right-0 z-50 glass">
@@ -12,12 +13,13 @@ export const Navbar = () => (
         <a href="#services" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Services</a>
         <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Pricing</a>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
         <Link to="/schedule">
           <Button variant="hero">Book Now</Button>
         </Link>
         <Link to="/admin">
-          <Button variant="ghost" size="sm" className="text-xs uppercase tracking-widest text-muted-foreground">Admin</Button>
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-xs uppercase tracking-widest text-muted-foreground">Admin</Button>
         </Link>
       </div>
     </div>

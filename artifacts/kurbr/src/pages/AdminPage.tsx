@@ -8,6 +8,7 @@ import { HaulerManagement } from "@/components/admin/HaulerManagement";
 import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -262,6 +263,7 @@ const AdminPage = () => {
                 </div>
               )}
             </div>
+            <ThemeToggle />
             <div className="w-8 h-8 bg-secondary flex items-center justify-center text-xs font-mono font-bold">CC</div>
           </div>
         </header>

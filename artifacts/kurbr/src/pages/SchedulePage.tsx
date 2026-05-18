@@ -10,6 +10,7 @@ import { apiPost } from "@/lib/apiClient";
 import { toast } from "sonner";
 import scrappyClipboard from "@/assets/scrappy-clipboard.png";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -192,7 +193,10 @@ const SchedulePage = () => {
           <Link to="/" className="text-xl font-bold tracking-[-0.06em]">
             KURBR<span className="text-primary">.</span>
           </Link>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono">Schedule Pickup</p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono hidden sm:block">Schedule Pickup</p>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -466,7 +470,7 @@ const SchedulePage = () => {
                     className={`flex items-start gap-3 w-full text-left border-milled p-4 transition-colors ${smsOptIn ? "border-primary bg-primary/5" : "hover:bg-secondary/30"}`}
                   >
                     <div className={`mt-0.5 w-4 h-4 border-2 shrink-0 flex items-center justify-center transition-colors ${smsOptIn ? "border-primary bg-primary" : "border-secondary"}`}>
-                      {smsOptIn && <Check className="w-2.5 h-2.5 text-black" />}
+                      {smsOptIn && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
                     </div>
                     <div>
                       <p className="text-sm font-mono font-bold">Get SMS updates</p>

@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { apiGet, apiPatch } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -140,6 +141,7 @@ const DispatchDashboard = () => {
             >
               Refresh
             </button>
+            <ThemeToggle />
           </div>
         </header>
 

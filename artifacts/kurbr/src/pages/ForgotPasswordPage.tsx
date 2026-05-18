@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ForgotPasswordPage = () => {
   const clerk = useClerk();
@@ -37,7 +38,8 @@ const ForgotPasswordPage = () => {
 
   if (sent) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4"><ThemeToggle /></div>
         <div className="text-center space-y-4 max-w-sm">
           <h2 className="text-xl font-bold font-mono">Check your email</h2>
           <p className="text-muted-foreground text-sm">
@@ -54,7 +56,8 @@ const ForgotPasswordPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4"><ThemeToggle /></div>
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold tracking-[-0.06em] font-mono">Reset Password</h1>

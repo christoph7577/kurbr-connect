@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { LayoutDashboard, Truck, Users, LogOut, X, Radio } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export type AdminView = "dashboard" | "haulers" | "dispatch";
 
@@ -56,7 +57,11 @@ export const AdminSidebar = ({ open, onClose, activeView, onChangeView }: AdminS
             </Link>
           ))}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border space-y-1">
+          <div className="px-3 py-1 flex items-center justify-between">
+            <span className="uppercase tracking-widest text-xs text-sidebar-foreground/60">Theme</span>
+            <ThemeToggle />
+          </div>
           <button
             onClick={signOut}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground"
