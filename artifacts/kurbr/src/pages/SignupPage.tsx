@@ -27,8 +27,6 @@ const SignupPage = () => {
       await clerk.client.signUp.create({
         emailAddress: email,
         password,
-        firstName: fullName.split(" ")[0],
-        lastName: fullName.split(" ").slice(1).join(" ") || undefined,
       });
       await clerk.client.signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
