@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus, Phone, MessageSquare } from "lucide-react";
+import { CheckCircle, ChevronDown, Loader2, XCircle, UserPlus, Phone, MessageSquare, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiGet, apiPatch } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { toast } from "sonner";
 import type { Job } from "./JobQueue";
 
@@ -37,9 +37,10 @@ interface Hauler {
 interface JobDetailProps {
   job: Job;
   onUpdate: () => void;
+  onDelete?: () => void;
 }
 
-export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
+export const JobDetail = ({ job, onUpdate, onDelete }: JobDetailProps) => {
   const [updating, setUpdating] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showHaulerPicker, setShowHaulerPicker] = useState(false);
@@ -93,6 +94,21 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
       onUpdate();
     } catch (err: any) {
       toast.error("Failed to update status");
+      console.error(err);
+    }
+    setUpdating(false);
+  };
+
+  const deleteJob = async () => {
+    if (!window.confirm(`Permanently delete ${job.id}? This cannot be undone.`)) return;
+    setUpdating(true);
+    try {
+      await apiDelete(`/jobs/${job.dbId}`);
+      toast.success(`${job.id} deleted`);
+      onDelete?.();
+      onUpdate();
+    } catch (err) {
+      toast.error("Failed to delete job");
       console.error(err);
     }
     setUpdating(false);
@@ -309,6 +325,15 @@ export const JobDetail = ({ job, onUpdate }: JobDetailProps) => {
               <XCircle className="w-3 h-3" /> Cancel Job
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 text-destructive hover:bg-destructive/10 border-destructive/40"
+            onClick={deleteJob}
+            disabled={updating}
+          >
+            <Trash2 className="w-3 h-3" /> Delete Job
+          </Button>
         </div>
       </div>
     </div>

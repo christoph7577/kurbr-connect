@@ -624,4 +624,78 @@ router.patch("/jobs/:id", requireAuth, async (req: Request, res: Response): Prom
   }
 });
 
+// DELETE /api/jobs — admin only — wipe all jobs (testing / clean slate)
+// Note: scoped before /jobs/:id so it doesn't get matched as id="" — but Express
+// only matches /jobs (no trailing segment) here, so order with :id is irrelevant.
+router.delete("/jobs", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const all = await db.select({ photos: jobsTable.photos }).from(jobsTable);
+    const photoKeys = all
+      .flatMap((j) => j.photos ?? [])
+      .filter((u): u is string => typeof u === "string" && OWN_PHOTO_URL_RE.test(u))
+      .map((u) => u.replace(/^\/api\/jobs\/photos\//, ""));
+
+    // Clear hauler locations (no longer tied to any active job)
+    await db
+      .update(haulerProfilesTable)
+      .set({ currentLat: null, currentLng: null, locationUpdatedAt: null });
+
+    const deleted = await db.delete(jobsTable).returning({ id: jobsTable.id });
+
+    // Best-effort: delete photos from GCS
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (bucketId && photoKeys.length > 0) {
+      const bucket = objectStorageClient.bucket(bucketId);
+      await Promise.all(
+        photoKeys.map((key) =>
+          bucket.file(key).delete().catch((err) => req.log.warn({ err, key }, "Failed to delete photo")),
+        ),
+      );
+    }
+
+    res.json({ deletedCount: deleted.length });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/jobs/:id — admin only — delete a single job
+router.delete("/jobs/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const jobId = String(req.params["id"]);
+  try {
+    const [existing] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Clear hauler's stored location if this was their active job
+    if (existing.haulerId) {
+      await db
+        .update(haulerProfilesTable)
+        .set({ currentLat: null, currentLng: null, locationUpdatedAt: null })
+        .where(eq(haulerProfilesTable.id, existing.haulerId));
+    }
+
+    await db.delete(jobsTable).where(eq(jobsTable.id, jobId));
+
+    // Best-effort: delete photos from GCS
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const photoKeys = (existing.photos ?? [])
+      .filter((u): u is string => typeof u === "string" && OWN_PHOTO_URL_RE.test(u))
+      .map((u) => u.replace(/^\/api\/jobs\/photos\//, ""));
+    if (bucketId && photoKeys.length > 0) {
+      const bucket = objectStorageClient.bucket(bucketId);
+      await Promise.all(
+        photoKeys.map((key) =>
+          bucket.file(key).delete().catch((err) => req.log.warn({ err, key }, "Failed to delete photo")),
+        ),
+      );
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

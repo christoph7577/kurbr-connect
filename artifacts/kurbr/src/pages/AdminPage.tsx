@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { Search, Bell, Menu, Loader2, Download, TrendingUp, ExternalLink, CheckCircle, Mail } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Search, Bell, Menu, Loader2, Download, TrendingUp, ExternalLink, CheckCircle, Mail, Trash2, Trash } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { JobQueue, type Job } from "@/components/admin/JobQueue";
 import { JobDetail } from "@/components/admin/JobDetail";
 import { HaulerManagement } from "@/components/admin/HaulerManagement";
-import { apiGet, apiPatch } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -77,6 +77,18 @@ const AdminPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showChart, setShowChart] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const onClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotifications(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [showNotifications]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -120,6 +132,39 @@ const AdminPage = () => {
     }
   };
 
+  const handleDeleteJob = async (job: Job) => {
+    if (!window.confirm(`Permanently delete ${job.id}? This cannot be undone.`)) return;
+    try {
+      await apiDelete(`/jobs/${job.dbId}`);
+      toast.success(`${job.id} deleted`);
+      if (selectedJob?.dbId === job.dbId) {
+        setSelectedJob(null);
+        setShowDetail(false);
+      }
+      await fetchJobs();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete job");
+    }
+  };
+
+  const handleClearAllJobs = async () => {
+    const count = jobs.length;
+    if (count === 0) { toast.info("No jobs to clear"); return; }
+    if (!window.confirm(`Permanently delete ALL ${count} jobs? This cannot be undone — use only for testing.`)) return;
+    if (!window.confirm(`Final confirmation: wipe ${count} jobs?`)) return;
+    setClearing(true);
+    try {
+      const { deletedCount } = await apiDelete<{ deletedCount: number }>("/jobs");
+      toast.success(`Cleared ${deletedCount} jobs`);
+      setSelectedJob(null);
+      setShowDetail(false);
+      await fetchJobs();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear jobs");
+    }
+    setClearing(false);
+  };
+
   const filteredJobs = jobs.filter((j) => {
     const matchesStatus = statusFilter === "all" || j.status === statusFilter;
     const matchesSearch = !searchQuery || (
@@ -136,7 +181,8 @@ const AdminPage = () => {
       revenue: d.totalCents / 100,
     }));
 
-  const unassignedCount = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status)).length;
+  const unassignedJobs = jobs.filter((j) => j.hauler === "Unassigned" && !["completed", "cancelled"].includes(j.status));
+  const unassignedCount = unassignedJobs.length;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -172,10 +218,50 @@ const AdminPage = () => {
             >
               <TrendingUp className="w-4 h-4" /> Revenue
             </button>
-            <button className="relative">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              {unassignedCount > 0 && <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />}
+            <button
+              onClick={handleClearAllJobs}
+              disabled={clearing || jobs.length === 0}
+              className="hidden md:flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground"
+              title="Delete all jobs (testing)"
+            >
+              {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Clear All
             </button>
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifications((v) => !v)}
+                className="relative p-1 hover:bg-secondary/50 rounded transition-colors"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5 text-muted-foreground" />
+                {unassignedCount > 0 && <div className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full" />}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-card border-milled shadow-card w-80 max-h-[400px] overflow-y-auto">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-widest">Unassigned Jobs</span>
+                    <span className="text-xs font-mono text-primary">{unassignedCount}</span>
+                  </div>
+                  {unassignedCount === 0 ? (
+                    <div className="p-6 text-center text-xs font-mono text-muted-foreground">All caught up.</div>
+                  ) : (
+                    unassignedJobs.slice(0, 10).map((j) => (
+                      <button
+                        key={j.dbId}
+                        onClick={() => { setShowNotifications(false); handleSelectJob(j); }}
+                        className="w-full text-left px-4 py-3 hover:bg-secondary/50 border-b border-border last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono text-xs font-bold">{j.id}</span>
+                          <span className="text-[10px] font-mono uppercase text-primary">{j.status.replace("_", " ")}</span>
+                        </div>
+                        <p className="text-xs text-foreground truncate">{j.customer}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono truncate">{j.address}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <div className="w-8 h-8 bg-secondary flex items-center justify-center text-xs font-mono font-bold">CC</div>
           </div>
         </header>
@@ -274,10 +360,10 @@ const AdminPage = () => {
                     <button onClick={() => setShowDetail(false)} className="text-xs uppercase tracking-widest text-primary font-mono mb-4 flex items-center gap-1">
                       ← Back to queue
                     </button>
-                    <JobDetail job={selectedJob} onUpdate={fetchJobs} />
+                    <JobDetail job={selectedJob} onUpdate={fetchJobs} onDelete={() => { setSelectedJob(null); setShowDetail(false); }} />
                   </div>
                 ) : (
-                  <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} />
+                  <JobQueue jobs={filteredJobs} selectedJob={selectedJob} onSelectJob={handleSelectJob} onMarkComplete={handleMarkComplete} onDeleteJob={handleDeleteJob} />
                 )}
               </div>
 
@@ -339,6 +425,13 @@ const AdminPage = () => {
                                 >
                                   <ExternalLink className="w-3 h-3 text-muted-foreground" />
                                 </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteJob(job); }}
+                                  className="p-1 hover:bg-destructive/20 rounded transition-colors"
+                                  title="Delete job"
+                                >
+                                  <Trash className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -357,7 +450,7 @@ const AdminPage = () => {
                   )}
                 </div>
                 <div>
-                  {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} />}
+                  {selectedJob && <JobDetail job={selectedJob} onUpdate={fetchJobs} onDelete={() => setSelectedJob(null)} />}
                 </div>
               </div>
             </>

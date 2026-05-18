@@ -1,4 +1,5 @@
-import { AlertTriangle, MoreHorizontal } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, MoreHorizontal, Eye, CheckCircle, Trash2 } from "lucide-react";
 
 export interface Job {
   id: string;
@@ -31,9 +32,62 @@ interface JobQueueProps {
   jobs: Job[];
   selectedJob: Job | null;
   onSelectJob: (job: Job) => void;
+  onMarkComplete?: (job: Job) => void;
+  onDeleteJob?: (job: Job) => void;
 }
 
-export const JobQueue = ({ jobs, selectedJob, onSelectJob }: JobQueueProps) => (
+const RowActions = ({ job, onSelectJob, onMarkComplete, onDeleteJob }: { job: Job } & Pick<JobQueueProps, "onSelectJob" | "onMarkComplete" | "onDeleteJob">) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="p-1 hover:bg-secondary rounded transition-colors"
+        aria-label="Job actions"
+      >
+        <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-card border-milled shadow-card min-w-[160px]">
+          <button
+            onClick={() => { setOpen(false); onSelectJob(job); }}
+            className="w-full text-left px-3 py-2 text-xs font-mono uppercase hover:bg-secondary/50 flex items-center gap-2"
+          >
+            <Eye className="w-3 h-3" /> View
+          </button>
+          {onMarkComplete && !["completed", "cancelled"].includes(job.status) && (
+            <button
+              onClick={() => { setOpen(false); onMarkComplete(job); }}
+              className="w-full text-left px-3 py-2 text-xs font-mono uppercase hover:bg-green-500/10 text-green-500 flex items-center gap-2"
+            >
+              <CheckCircle className="w-3 h-3" /> Mark Complete
+            </button>
+          )}
+          {onDeleteJob && (
+            <button
+              onClick={() => { setOpen(false); onDeleteJob(job); }}
+              className="w-full text-left px-3 py-2 text-xs font-mono uppercase hover:bg-destructive/10 text-destructive border-t border-border flex items-center gap-2"
+            >
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const JobQueue = ({ jobs, selectedJob, onSelectJob, onMarkComplete, onDeleteJob }: JobQueueProps) => (
   <div>
     <div className="flex items-center justify-between mb-4">
       <h3 className="text-sm font-bold uppercase tracking-widest">Active Queue</h3>
@@ -105,7 +159,7 @@ export const JobQueue = ({ jobs, selectedJob, onSelectJob }: JobQueueProps) => (
               <td className="p-4 font-mono text-sm tabular-nums">{job.eta}</td>
               <td className="p-4 font-mono text-sm text-right tabular-nums">{job.price}</td>
               <td className="p-4">
-                <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                <RowActions job={job} onSelectJob={onSelectJob} onMarkComplete={onMarkComplete} onDeleteJob={onDeleteJob} />
               </td>
             </tr>
           ))}

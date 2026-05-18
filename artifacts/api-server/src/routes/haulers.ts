@@ -169,4 +169,100 @@ router.patch("/haulers/:id", requireAdmin, async (req: Request, res: Response): 
   }
 });
 
+// POST /api/haulers/admin — admin only — manually create a hauler (and optional
+// placeholder profile row). Used by admin dashboard to onboard haulers without
+// requiring them to sign up through the customer-facing flow.
+router.post("/haulers/admin", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      businessName,
+      contactName,
+      contactEmail,
+      contactPhone,
+      licenseNumber,
+      vehicleType,
+      vehiclePlate,
+      serviceAreas,
+      status,
+    } = req.body as Record<string, unknown>;
+
+    if (typeof vehicleType !== "string" || !vehicleType.trim()) {
+      res.status(400).json({ error: "vehicleType is required" }); return;
+    }
+    if (typeof vehiclePlate !== "string" || !vehiclePlate.trim()) {
+      res.status(400).json({ error: "vehiclePlate is required" }); return;
+    }
+    if (typeof businessName !== "string" || !businessName.trim()) {
+      res.status(400).json({ error: "businessName is required" }); return;
+    }
+
+    // Synthetic userId for haulers added manually (no Clerk account yet).
+    // When they later sign up with the same email, profile bootstrap can be linked.
+    const userId = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+    // Create a placeholder profile row so /haulers GET join displays contact info
+    if (typeof contactEmail === "string" && contactEmail.trim()) {
+      await db.insert(profilesTable).values({
+        id: userId,
+        fullName: typeof contactName === "string" ? contactName : null,
+        email: contactEmail,
+        phone: typeof contactPhone === "string" ? contactPhone : null,
+        role: "hauler",
+      }).onConflictDoNothing();
+    }
+
+    const validStatus = ["pending", "approved", "rejected", "suspended"];
+    const haulerStatus = typeof status === "string" && validStatus.includes(status)
+      ? (status as HaulerProfile["status"])
+      : "approved";
+
+    const [hauler] = await db.insert(haulerProfilesTable).values({
+      userId,
+      businessName,
+      licenseNumber: typeof licenseNumber === "string" ? licenseNumber : null,
+      vehicleType,
+      vehiclePlate,
+      serviceAreas: Array.isArray(serviceAreas) ? serviceAreas as string[] : [],
+      status: haulerStatus,
+      backgroundCheckConsent: false,
+      trainingCompleted: false,
+      documents: [],
+    }).returning();
+
+    const [profile] = await db
+      .select()
+      .from(profilesTable)
+      .where(eq(profilesTable.id, userId))
+      .limit(1);
+
+    res.status(201).json({
+      ...hauler,
+      profileName: profile?.fullName ?? null,
+      profileEmail: profile?.email ?? null,
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/haulers/:id — admin only
+router.delete("/haulers/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const haulerId = String(req.params["id"]);
+  try {
+    const [existing] = await db
+      .select({ id: haulerProfilesTable.id })
+      .from(haulerProfilesTable)
+      .where(eq(haulerProfilesTable.id, haulerId))
+      .limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    await db.delete(haulerProfilesTable).where(eq(haulerProfilesTable.id, haulerId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    // Most likely cause: existing jobs reference this hauler (FK constraint)
+    res.status(409).json({ error: "Cannot delete hauler — they are referenced by existing jobs. Reassign or delete those jobs first." });
+  }
+});
+
 export default router;
