@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactElement } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   ArrowLeft,
   User,
   Truck,
+  Container,
+  Caravan,
+  Construction,
   FileText,
   ShieldCheck,
   BookOpen,
@@ -83,11 +86,32 @@ const HaulerOnboardingPage = () => {
   }, [inviteToken]);
 
   const areas = ["Salt Lake City", "Provo/Orem", "Ogden", "Park City"];
-  const vehicleTypes = [
-    { id: "pickup", label: "PICKUP TRUCK" },
-    { id: "box_truck", label: "BOX TRUCK" },
-    { id: "trailer", label: "TRUCK + TRAILER" },
-    { id: "dump_truck", label: "DUMP TRUCK" },
+  const vehicleTypes: { id: string; label: string; Icon: (props: { className?: string }) => ReactElement }[] = [
+    {
+      id: "pickup",
+      label: "PICKUP TRUCK",
+      Icon: ({ className }) => <Truck className={className} />,
+    },
+    {
+      id: "box_truck",
+      label: "BOX TRUCK",
+      Icon: ({ className }) => <Container className={className} />,
+    },
+    {
+      id: "trailer",
+      label: "TRUCK + TRAILER",
+      Icon: ({ className }) => (
+        <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
+          <Truck className="w-5 h-5" />
+          <Caravan className="w-5 h-5" />
+        </span>
+      ),
+    },
+    {
+      id: "dump_truck",
+      label: "DUMP TRUCK",
+      Icon: ({ className }) => <Construction className={className} />,
+    },
   ];
 
   const toggleArea = (area: string) =>
@@ -270,7 +294,7 @@ const HaulerOnboardingPage = () => {
                             : "hover:bg-secondary/50"
                         }`}
                       >
-                        <Truck className="w-5 h-5 text-muted-foreground mb-2" />
+                        <v.Icon className="w-5 h-5 text-muted-foreground mb-2" />
                         <p className="text-xs font-bold uppercase tracking-widest">{v.label}</p>
                       </button>
                     ))}
