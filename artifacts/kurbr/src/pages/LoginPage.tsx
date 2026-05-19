@@ -18,7 +18,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   // Second-factor state
   const [needsMfa, setNeedsMfa] = useState(false);
-  const [mfaStrategy, setMfaStrategy] = useState<"totp" | "phone_code" | "backup_code">("totp");
+  const [mfaStrategy, setMfaStrategy] = useState<"totp" | "phone_code" | "backup_code" | "email_code">("totp");
   const [supportedFactors, setSupportedFactors] = useState<string[]>([]);
   const [mfaCode, setMfaCode] = useState("");
 
@@ -36,17 +36,34 @@ const LoginPage = () => {
         const supported = (result as { supportedSecondFactors?: { strategy: string }[] }).supportedSecondFactors ?? [];
         const strategies = supported.map((f) => f.strategy);
         setSupportedFactors(strategies);
-        // Default to the first supported strategy
-        const first = strategies[0] as "totp" | "phone_code" | "backup_code" | undefined;
-        if (first === "totp" || first === "phone_code" || first === "backup_code") {
-          setMfaStrategy(first);
-        } else {
+        const allowed = ["totp", "phone_code", "backup_code", "email_code"] as const;
+        type Strategy = (typeof allowed)[number];
+        const first = strategies.find((s): s is Strategy => (allowed as readonly string[]).includes(s));
+        if (!first) {
           toast({
             title: "Unsupported 2FA",
             description: `Account requires: ${strategies.join(", ") || "unknown"}. Contact support.`,
             variant: "destructive",
           });
           return;
+        }
+        setMfaStrategy(first);
+        // phone_code and email_code need to be prepared (sent) before the user enters a code.
+        // TOTP and backup_code are user-supplied and don't require preparation.
+        if (first === "email_code" || first === "phone_code") {
+          try {
+            await clerk.client.signIn.prepareSecondFactor({ strategy: first });
+            toast({
+              title: first === "email_code" ? "Code sent to your email" : "Code sent to your phone",
+            });
+          } catch (prepErr: unknown) {
+            const m =
+              (prepErr as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+              (prepErr as { message?: string })?.message ??
+              "Could not send code";
+            toast({ title: "Could not send code", description: m, variant: "destructive" });
+            return;
+          }
         }
         setNeedsMfa(true);
       } else {
@@ -73,9 +90,9 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const result = await clerk.client.signIn.attemptSecondFactor({
-        strategy: mfaStrategy,
+        strategy: mfaStrategy as "totp" | "phone_code" | "backup_code" | "email_code",
         code: mfaCode,
-      });
+      } as Parameters<typeof clerk.client.signIn.attemptSecondFactor>[0]);
       if (result.status === "complete") {
         await clerk.setActive({ session: result.createdSessionId });
         window.location.href = "/";
@@ -111,6 +128,7 @@ const LoginPage = () => {
             <p className="text-muted-foreground text-sm">
               {mfaStrategy === "totp" && "Enter the 6-digit code from your authenticator app"}
               {mfaStrategy === "phone_code" && "Enter the code sent to your phone"}
+              {mfaStrategy === "email_code" && "Enter the code sent to your email"}
               {mfaStrategy === "backup_code" && "Enter one of your backup codes"}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -120,7 +138,10 @@ const LoginPage = () => {
           <form onSubmit={handleMfa} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="mfa-code">
-                {mfaStrategy === "totp" ? "Authenticator Code" : "SMS Code"}
+                {mfaStrategy === "totp" && "Authenticator Code"}
+                {mfaStrategy === "phone_code" && "SMS Code"}
+                {mfaStrategy === "email_code" && "Email Code"}
+                {mfaStrategy === "backup_code" && "Backup Code"}
               </Label>
               <Input
                 id="mfa-code"
@@ -146,7 +167,23 @@ const LoginPage = () => {
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { setMfaStrategy(s as typeof mfaStrategy); setMfaCode(""); }}
+                  onClick={async () => {
+                    const next = s as typeof mfaStrategy;
+                    setMfaStrategy(next);
+                    setMfaCode("");
+                    if ((next === "email_code" || next === "phone_code") && clerk.client?.signIn) {
+                      try {
+                        await clerk.client.signIn.prepareSecondFactor({ strategy: next });
+                        toast({ title: next === "email_code" ? "Code sent to your email" : "Code sent to your phone" });
+                      } catch (err: unknown) {
+                        const m =
+                          (err as { errors?: { longMessage?: string }[] })?.errors?.[0]?.longMessage ??
+                          (err as { message?: string })?.message ??
+                          "Could not send code";
+                        toast({ title: "Could not send code", description: m, variant: "destructive" });
+                      }
+                    }
+                  }}
                   className={`px-2 py-1 rounded border ${s === mfaStrategy ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
                 >
                   {s}
