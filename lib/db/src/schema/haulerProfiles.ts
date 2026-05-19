@@ -21,7 +21,7 @@ export const haulerProfilesTable = pgTable("hauler_profiles", {
   backgroundCheckDate: text("background_check_date"),
   trainingCompleted: boolean("training_completed").default(false),
   trainingCompletedDate: text("training_completed_date"),
-  documents: json("documents").$type<{ type: string; uploaded: boolean }[]>().default([]),
+  documents: json("documents").$type<{ type: string; uploaded: boolean; url?: string; filename?: string; mimeType?: string }[]>().default([]),
   status: haulerStatusEnum("status").default("pending").notNull(),
   currentLat: doublePrecision("current_lat"),
   currentLng: doublePrecision("current_lng"),

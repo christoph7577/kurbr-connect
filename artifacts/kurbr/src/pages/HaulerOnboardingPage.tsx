@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, Navigate } from "react-router-dom";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiUpload } from "@/lib/apiClient";
 import { toast } from "sonner";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,10 +58,31 @@ const HaulerOnboardingPage = () => {
   const [licenseNumber, setLicenseNumber] = useState("");
   const [serviceAreas, setServiceAreas] = useState<string[]>([]);
 
-  // Step 2: Documents
-  const [driversLicense, setDriversLicense] = useState(false);
-  const [insurance, setInsurance] = useState(false);
-  const [businessLicense, setBizLicense] = useState(false);
+  // Step 2: Documents — each holds the uploaded file's metadata (or null if not yet uploaded)
+  type UploadedDoc = { url: string; filename: string; mimeType: string };
+  const [driversLicense, setDriversLicense] = useState<UploadedDoc | null>(null);
+  const [insurance, setInsurance] = useState<UploadedDoc | null>(null);
+  const [businessLicense, setBizLicense] = useState<UploadedDoc | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+
+  async function handleDocUpload(
+    docType: "drivers_license" | "insurance" | "business_license",
+    file: File,
+    setter: (d: UploadedDoc | null) => void,
+  ) {
+    setUploadingDoc(docType);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiUpload<UploadedDoc>("/haulers/documents", fd);
+      setter(res);
+      toast.success(`${file.name} uploaded`);
+    } catch (err) {
+      toast.error((err as Error).message || "Upload failed");
+    } finally {
+      setUploadingDoc(null);
+    }
+  }
 
   // Step 3: Background check
   const [bgConsent, setBgConsent] = useState(false);
@@ -127,7 +148,7 @@ const HaulerOnboardingPage = () => {
   const canNext = () => {
     if (step === 0) return fullName.length > 1 && email.includes("@") && phone.length > 6;
     if (step === 1) return !!vehicleType && vehiclePlate.length > 2 && serviceAreas.length > 0;
-    if (step === 2) return driversLicense && insurance;
+    if (step === 2) return !!driversLicense && !!insurance;
     if (step === 3) return bgConsent;
     if (step === 4) return completedModules.length === trainingModules.length;
     return true;
@@ -146,10 +167,10 @@ const HaulerOnboardingPage = () => {
         backgroundCheckConsent: bgConsent,
         trainingCompleted: true,
         documents: [
-          { type: "drivers_license", uploaded: driversLicense },
-          { type: "insurance", uploaded: insurance },
-          { type: "business_license", uploaded: businessLicense },
-        ],
+          driversLicense && { type: "drivers_license", uploaded: true, ...driversLicense },
+          insurance && { type: "insurance", uploaded: true, ...insurance },
+          businessLicense && { type: "business_license", uploaded: true, ...businessLicense },
+        ].filter(Boolean),
       });
 
       // Mark the lead as onboarded so the admin's call list reflects conversion
@@ -364,47 +385,58 @@ const HaulerOnboardingPage = () => {
               <h2 className="text-3xl md:text-4xl font-bold mb-10">Upload documents</h2>
 
               <div className="space-y-4">
-                {[
-                  { label: "Driver's License", required: true, checked: driversLicense, set: setDriversLicense },
-                  { label: "Insurance Certificate", required: true, checked: insurance, set: setInsurance },
-                  { label: "Business License", required: false, checked: businessLicense, set: setBizLicense },
-                ].map((doc) => (
-                  <button
-                    key={doc.label}
-                    onClick={() => doc.set(!doc.checked)}
-                    className={`w-full border-milled p-6 text-left flex items-center justify-between transition-colors ${
-                      doc.checked ? "border-primary bg-primary/5" : "hover:bg-secondary/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`w-10 h-10 flex items-center justify-center transition-colors ${
-                          doc.checked ? "bg-primary" : "bg-secondary"
-                        }`}
-                      >
-                        {doc.checked ? (
-                          <Check className="w-5 h-5 text-primary-foreground" />
-                        ) : (
-                          <Upload className="w-5 h-5 text-muted-foreground" />
-                        )}
+                {([
+                  { type: "drivers_license" as const, label: "Driver's License", required: true, value: driversLicense, set: setDriversLicense },
+                  { type: "insurance" as const, label: "Insurance Certificate", required: true, value: insurance, set: setInsurance },
+                  { type: "business_license" as const, label: "Business License", required: false, value: businessLicense, set: setBizLicense },
+                ]).map((doc) => {
+                  const isUploading = uploadingDoc === doc.type;
+                  const uploaded = doc.value;
+                  return (
+                    <label
+                      key={doc.type}
+                      className={`w-full border-milled p-6 text-left flex items-center justify-between transition-colors cursor-pointer ${
+                        uploaded ? "border-primary bg-primary/5" : "hover:bg-secondary/50"
+                      } ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div
+                          className={`w-10 h-10 flex-shrink-0 flex items-center justify-center transition-colors ${
+                            uploaded ? "bg-primary" : "bg-secondary"
+                          }`}
+                        >
+                          {uploaded ? (
+                            <Check className="w-5 h-5 text-primary-foreground" />
+                          ) : (
+                            <Upload className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold uppercase tracking-widest">{doc.label}</p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {uploaded
+                              ? uploaded.filename
+                              : `${doc.required ? "Required" : "Optional"} · PDF, JPG, PNG, WEBP (max 10MB)`}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold uppercase tracking-widest">{doc.label}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {doc.required ? "Required" : "Optional"} · PDF, JPG, PNG
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono text-primary">
-                      {doc.checked ? "UPLOADED" : "TAP TO UPLOAD"}
-                    </span>
-                  </button>
-                ))}
+                      <span className="text-xs font-mono text-primary flex-shrink-0 ml-3">
+                        {isUploading ? "UPLOADING…" : uploaded ? "REPLACE" : "TAP TO UPLOAD"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void handleDocUpload(doc.type, f, doc.set);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  );
+                })}
               </div>
-
-              <p className="text-xs text-muted-foreground mt-6 font-mono">
-                * In production, documents are securely uploaded to encrypted storage.
-              </p>
             </motion.div>
           )}
 

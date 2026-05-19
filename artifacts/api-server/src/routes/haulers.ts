@@ -1,11 +1,30 @@
 import { Router, type Request, type Response } from "express";
+import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { db } from "@workspace/db";
 import { haulerProfilesTable, profilesTable } from "@workspace/db";
 import { type HaulerProfile } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, requireAdmin, type AuthedRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, isAdminUser, type AuthedRequest } from "../middlewares/auth";
+import { uploadHaulerDocument, getDocumentBuffer, isAllowedDocumentMimeType } from "../lib/storage";
 
 const router = Router();
+
+const docUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 }, // 10MB
+});
+
+const docUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many uploads — please try again later" },
+});
+
+// Only object keys we issue from uploadHaulerDocument are servable
+const HAULER_DOC_KEY_RE = /^hauler-docs\/[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/;
 
 // GET /api/haulers/me — authenticated hauler, own profile only
 router.get("/haulers/me", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -264,5 +283,77 @@ router.delete("/haulers/:id", requireAdmin, async (req: Request, res: Response):
     res.status(409).json({ error: "Cannot delete hauler — they are referenced by existing jobs. Reassign or delete those jobs first." });
   }
 });
+
+// POST /api/haulers/documents — authenticated upload of a single hauler onboarding doc
+router.post(
+  "/haulers/documents",
+  requireAuth,
+  docUploadLimiter,
+  docUpload.single("file"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "No file provided" });
+        return;
+      }
+      if (!isAllowedDocumentMimeType(file.mimetype)) {
+        res.status(400).json({ error: "Unsupported file type. Use PDF, JPG, PNG, or WEBP." });
+        return;
+      }
+      const objectKey = await uploadHaulerDocument(file.buffer, file.mimetype);
+      res.status(201).json({
+        url: `/api/haulers/documents/${objectKey}`,
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+      });
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  },
+);
+
+// GET /api/haulers/documents/hauler-docs/<uuid>.<ext> — auth: admin OR owning hauler
+router.get(
+  "/haulers/documents/*objectKey",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req as AuthedRequest;
+    try {
+      const raw = req.params["objectKey"];
+      const objectKey = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
+      if (!HAULER_DOC_KEY_RE.test(objectKey)) {
+        res.status(400).json({ error: "Invalid object key" });
+        return;
+      }
+      const admin = await isAdminUser(userId);
+      if (!admin) {
+        // Caller must own a hauler profile whose documents reference this URL
+        const [hauler] = await db
+          .select({ documents: haulerProfilesTable.documents })
+          .from(haulerProfilesTable)
+          .where(eq(haulerProfilesTable.userId, userId))
+          .limit(1);
+        const refUrl = `/api/haulers/documents/${objectKey}`;
+        const owned = (hauler?.documents ?? []).some(
+          (d) => typeof (d as { url?: unknown }).url === "string" && (d as { url: string }).url === refUrl,
+        );
+        if (!owned) {
+          res.status(403).json({ error: "Forbidden" });
+          return;
+        }
+      }
+      const { buffer, mimeType } = await getDocumentBuffer(objectKey);
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Cache-Control", "private, max-age=300");
+      res.send(buffer);
+    } catch (err) {
+      req.log.error(err);
+      res.status(404).json({ error: "Not found" });
+    }
+  },
+);
 
 export default router;
