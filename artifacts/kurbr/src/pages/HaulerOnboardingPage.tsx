@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, Navigate } from "react-router-dom";
-import { apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost } from "@/lib/apiClient";
 import { toast } from "sonner";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +38,7 @@ const trainingModules = [
 
 const HaulerOnboardingPage = () => {
   const { isSignedIn, loading, userId } = useAuth();
+  const inviteToken = new URLSearchParams(window.location.search).get("invite");
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -64,6 +65,22 @@ const HaulerOnboardingPage = () => {
 
   // Step 4: Training
   const [completedModules, setCompletedModules] = useState<string[]>([]);
+
+  // Prefill from outbound-call invite link (admin's Leads page generated this)
+  useEffect(() => {
+    if (!inviteToken) return;
+    apiGet<{ name: string | null; email: string | null; phone: string | null; location: string | null }>(
+      `/leads/by-token/${inviteToken}`,
+    )
+      .then((lead) => {
+        if (lead.name) setFullName(lead.name);
+        if (lead.email) setEmail(lead.email);
+        if (lead.phone) setPhone(lead.phone);
+      })
+      .catch(() => {
+        // Invalid invite token — silently ignore, user can still fill manually
+      });
+  }, [inviteToken]);
 
   const areas = ["Salt Lake City", "Provo/Orem", "Ogden", "Park City"];
   const vehicleTypes = [
@@ -110,6 +127,13 @@ const HaulerOnboardingPage = () => {
           { type: "business_license", uploaded: businessLicense },
         ],
       });
+
+      // Mark the lead as onboarded so the admin's call list reflects conversion
+      if (inviteToken) {
+        apiPost(`/leads/by-token/${inviteToken}/onboarded`, {}).catch(() => {
+          // best-effort; submission already succeeded
+        });
+      }
 
       setSubmitted(true);
       toast.success("Application submitted successfully!");

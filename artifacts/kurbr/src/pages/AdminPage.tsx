@@ -7,6 +7,8 @@ import { JobQueue, type Job, type AiEstimate } from "@/components/admin/JobQueue
 import { JobDetail } from "@/components/admin/JobDetail";
 import { HaulerManagement } from "@/components/admin/HaulerManagement";
 import { TeamManagement } from "@/components/admin/TeamManagement";
+import { HaulerLeads } from "@/components/admin/HaulerLeads";
+import { DataExplorer } from "@/components/admin/DataExplorer";
 import { apiGet, apiPatch, apiDelete } from "@/lib/apiClient";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -75,7 +77,7 @@ const AdminPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>(() => {
     const view = new URLSearchParams(window.location.search).get("view") as AdminView;
-    return ["dashboard", "haulers", "team"].includes(view) ? view : "dashboard";
+    return ["dashboard", "haulers", "team", "leads", "data"].includes(view) ? view : "dashboard";
   });
   const [jobs, setJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<JobStats | null>(null);
@@ -280,6 +282,10 @@ const AdminPage = () => {
             <HaulerManagement />
           ) : activeView === "team" ? (
             <TeamManagement />
+          ) : activeView === "leads" ? (
+            <HaulerLeads />
+          ) : activeView === "data" ? (
+            <DataExplorer />
           ) : loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />

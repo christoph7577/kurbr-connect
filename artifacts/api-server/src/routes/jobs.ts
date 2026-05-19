@@ -473,6 +473,7 @@ router.post("/jobs", bookingLimiter, async (req: Request, res: Response): Promis
     const {
       serviceType, address, scheduledDate, scheduledTime, description,
       customerName, customerEmail, customerPhone, photos, smsOptIn, aiEstimate,
+      addressLat, addressLng,
     } = req.body as Record<string, unknown>;
     if (typeof serviceType !== "string" || !serviceType || typeof address !== "string" || !address) {
       res.status(400).json({ error: "serviceType and address are required" });
@@ -497,6 +498,8 @@ router.post("/jobs", bookingLimiter, async (req: Request, res: Response): Promis
       photos: validatedPhotos && validatedPhotos.length > 0 ? validatedPhotos : null,
       // AI estimate is informational for admin review; admin sets the final price.
       aiEstimate: aiEstimate && typeof aiEstimate === "object" ? (aiEstimate as Record<string, unknown>) : null,
+      addressLat: typeof addressLat === "number" && Number.isFinite(addressLat) ? addressLat : null,
+      addressLng: typeof addressLng === "number" && Number.isFinite(addressLng) ? addressLng : null,
       smsOptIn: smsOptIn === true,
       status: "pending",
     }).returning();

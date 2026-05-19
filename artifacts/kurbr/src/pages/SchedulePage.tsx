@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import scrappyClipboard from "@/assets/scrappy-clipboard.png";
 import scrappyThumbsup from "@/assets/scrappy-thumbsup.png";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 const springBolt = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -89,6 +90,7 @@ const SchedulePage = () => {
 
   // Location, schedule, details
   const [address, setAddress] = useState("");
+  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [description, setDescription] = useState("");
@@ -177,6 +179,8 @@ const SchedulePage = () => {
       const job = await apiPost<{ trackingToken: string }>("/jobs", {
         serviceType: service,
         address,
+        addressLat: addressCoords?.lat ?? null,
+        addressLng: addressCoords?.lng ?? null,
         scheduledDate: date,
         scheduledTime: time,
         description: description || null,
@@ -430,10 +434,15 @@ const SchedulePage = () => {
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Step 03</p>
               <h2 className="text-3xl md:text-4xl font-bold mb-10">Where's the pickup?</h2>
               <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Address</label>
-              <div className="relative">
-                <MapPin className="absolute left-0 top-3 w-4 h-4 text-muted-foreground" />
-                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Salt Lake City, UT" className="w-full bg-transparent border-b-2 border-secondary focus:border-primary outline-none transition-colors py-2 pl-6 font-mono" />
-              </div>
+              <AddressAutocomplete
+                value={address}
+                onChange={(addr, meta) => {
+                  setAddress(addr);
+                  setAddressCoords(meta ? { lat: meta.lat, lng: meta.lng } : null);
+                }}
+                placeholder="123 Main St, Salt Lake City, UT"
+                className="w-full bg-transparent border-b-2 border-secondary focus:border-primary outline-none transition-colors py-2 font-mono"
+              />
             </motion.div>
           )}
 

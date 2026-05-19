@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import { LayoutDashboard, Truck, Users, LogOut, X, Radio, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Truck, Users, LogOut, X, Radio, ShieldCheck, PhoneCall, Database } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-export type AdminView = "dashboard" | "haulers" | "dispatch" | "team";
+export type AdminView = "dashboard" | "haulers" | "dispatch" | "team" | "leads" | "data";
 
 interface AdminSidebarProps {
   open: boolean;
@@ -17,6 +17,8 @@ const navItems: { icon: typeof LayoutDashboard; label: string; view: AdminView; 
   { icon: LayoutDashboard, label: "Dashboard", view: "dashboard", href: "/admin" },
   { icon: Radio, label: "Dispatch", view: "dispatch", href: "/dispatch" },
   { icon: Users, label: "Haulers", view: "haulers", href: "/admin?view=haulers" },
+  { icon: PhoneCall, label: "Leads", view: "leads", href: "/admin?view=leads" },
+  { icon: Database, label: "Data", view: "data", href: "/admin?view=data" },
   { icon: ShieldCheck, label: "Team", view: "team", href: "/admin?view=team" },
 ];
 
