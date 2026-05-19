@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, Loader2, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Plus, Trash2, X, ShieldCheck, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ interface HaulerRow {
   serviceAreas: string[];
   status: HaulerStatus;
   bgConsent: boolean;
+  verified: boolean;
   trainingCompleted: boolean;
   createdAt: string;
   profileName: string | null;
@@ -65,6 +66,7 @@ export const HaulerManagement = () => {
           serviceAreas: h.serviceAreas || [],
           status: h.status,
           bgConsent: h.backgroundCheckConsent || false,
+          verified: h.verified || false,
           trainingCompleted: h.trainingCompleted || false,
           createdAt: h.createdAt,
           profileName: h.profileName || null,
@@ -92,6 +94,22 @@ export const HaulerManagement = () => {
       }
     } catch (err: any) {
       toast.error("Failed to update hauler status");
+      console.error(err);
+    }
+    setUpdating(false);
+  };
+
+  const toggleVerified = async (haulerId: string, nextVerified: boolean) => {
+    setUpdating(true);
+    try {
+      await apiPatch(`/haulers/${haulerId}`, { verified: nextVerified });
+      toast.success(nextVerified ? "Marked as Verified" : "Verification removed");
+      fetchHaulers();
+      if (selected?.id === haulerId) {
+        setSelected((prev) => prev ? { ...prev, verified: nextVerified } : null);
+      }
+    } catch (err: any) {
+      toast.error("Failed to update verification");
       console.error(err);
     }
     setUpdating(false);
@@ -292,8 +310,13 @@ export const HaulerManagement = () => {
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest mb-4">Hauler Detail</h3>
             <div className="border-milled p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-bold">{selected.businessName}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold flex items-center gap-2">
+                  {selected.businessName}
+                  {selected.verified && (
+                    <ShieldCheck className="w-4 h-4 text-primary" aria-label="Verified" />
+                  )}
+                </span>
                 <span className={`text-[10px] font-mono uppercase px-2 py-0.5 ${statusColors[selected.status]}`}>
                   {selected.status}
                 </span>
@@ -307,7 +330,8 @@ export const HaulerManagement = () => {
                   { label: "Plate", value: selected.vehiclePlate || "—" },
                   { label: "License", value: selected.licenseNumber || "—" },
                   { label: "Areas", value: selected.serviceAreas.join(", ") || "—" },
-                  { label: "BG Check", value: selected.bgConsent ? "Consented" : "No" },
+                  { label: "BG Check", value: selected.bgConsent ? "Consented" : "Declined / skipped" },
+                  { label: "Verified", value: selected.verified ? "Yes" : "No" },
                   { label: "Training", value: selected.trainingCompleted ? "Complete" : "Incomplete" },
                   { label: "Applied", value: new Date(selected.createdAt).toLocaleDateString() },
                 ].map((f) => (
@@ -366,6 +390,23 @@ export const HaulerManagement = () => {
                     Re-approve Hauler
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  onClick={() => toggleVerified(selected.id, !selected.verified)}
+                  disabled={updating}
+                >
+                  {selected.verified ? (
+                    <>
+                      <Shield className="w-3 h-3" /> Remove Verified Badge
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-3 h-3" /> Mark as Verified
+                    </>
+                  )}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

@@ -149,7 +149,7 @@ const HaulerOnboardingPage = () => {
     if (step === 0) return fullName.length > 1 && email.includes("@") && phone.length > 6;
     if (step === 1) return !!vehicleType && vehiclePlate.length > 2 && serviceAreas.length > 0;
     if (step === 2) return !!driversLicense && !!insurance;
-    if (step === 3) return bgConsent;
+    if (step === 3) return true;
     if (step === 4) return completedModules.length === trainingModules.length;
     return true;
   };
@@ -471,13 +471,18 @@ const HaulerOnboardingPage = () => {
 
                 <div className="border-t border-border pt-6 space-y-4">
                   <div className="text-sm text-muted-foreground space-y-2">
-                    <p>By consenting, you authorize KURBR to:</p>
-                    <ul className="list-none space-y-1">
+                    <p className="text-primary font-mono text-xs uppercase tracking-widest">Optional · Skip to continue</p>
+                    <p>
+                      Haulers who consent to a background check earn a{" "}
+                      <span className="text-foreground font-bold">Verified</span> badge that customers
+                      see when booking. Verified haulers typically receive more job offers.
+                    </p>
+                    <ul className="list-none space-y-1 pt-2">
                       {[
-                        "Verify your identity and driving record",
-                        "Run a criminal background check",
-                        "Verify insurance and business credentials",
-                        "Conduct periodic re-verification",
+                        "Identity and driving record verification",
+                        "Criminal background check",
+                        "Insurance and business credential review",
+                        "Periodic re-verification",
                       ].map((item) => (
                         <li key={item} className="flex items-center gap-2">
                           <span className="text-primary font-mono text-xs">→</span>
@@ -497,16 +502,19 @@ const HaulerOnboardingPage = () => {
                   }`}
                 >
                   <div
-                    className={`w-6 h-6 flex items-center justify-center transition-colors ${
+                    className={`w-6 h-6 flex-shrink-0 flex items-center justify-center transition-colors ${
                       bgConsent ? "bg-primary" : "bg-secondary"
                     }`}
                   >
                     {bgConsent && <Check className="w-4 h-4 text-primary-foreground" />}
                   </div>
-                  <span className="text-sm font-bold uppercase tracking-widest">
-                    I consent to a background check
+                  <span className="text-sm font-bold uppercase tracking-widest text-left">
+                    Yes, run a background check on me (recommended)
                   </span>
                 </button>
+                <p className="text-xs text-muted-foreground font-mono">
+                  You can opt in later from your hauler profile.
+                </p>
               </div>
             </motion.div>
           )}

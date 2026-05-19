@@ -156,12 +156,16 @@ router.patch("/haulers/:id/location", requireAuth, async (req: Request, res: Res
 router.patch("/haulers/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const haulerId = String(req.params["id"]);
   try {
-    const { status, businessName, vehicleType, vehiclePlate } = req.body as Record<string, unknown>;
+    const { status, businessName, vehicleType, vehiclePlate, verified } = req.body as Record<string, unknown>;
     const updateFields: Record<string, unknown> = { updatedAt: new Date() };
     if (status !== undefined) updateFields["status"] = status as HaulerProfile["status"];
     if (businessName !== undefined) updateFields["businessName"] = businessName as string | null;
     if (vehicleType !== undefined) updateFields["vehicleType"] = vehicleType as string | null;
     if (vehiclePlate !== undefined) updateFields["vehiclePlate"] = vehiclePlate as string | null;
+    if (typeof verified === "boolean") {
+      updateFields["verified"] = verified;
+      updateFields["verifiedAt"] = verified ? new Date() : null;
+    }
 
     const [hauler] = await db
       .update(haulerProfilesTable)
